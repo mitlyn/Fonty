@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 jupyter = "*"
+svgpathtools = "*"
+freetype-py = "*"
 
 [dev-packages]
 
