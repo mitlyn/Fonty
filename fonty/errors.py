@@ -1,0 +1,2 @@
+class FontyError(Exception):
+    pass

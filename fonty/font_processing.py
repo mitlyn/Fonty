@@ -1,6 +1,8 @@
 import os
 import tempfile
 
+import requests
+
 from collections import namedtuple
 
 import fontforge
@@ -11,15 +13,27 @@ import matplotlib.pyplot as plt
 
 from bs4 import BeautifulSoup
 
+import errors
+
 
 Glyph = namedtuple('Glyph', ['d', 'glyph_name', 'unicode'])
 
 
+class EmptyPathError(errors.FontyError):
+    pass
+
+
 class FontProcessor:
 
-    def __init__(self, input_address: str):
+    def __init__(self, input_address: str, flip_v: bool = False, flip_h: bool = False):
         """Opens font and reads all the glyphs in it.
+
+        Arguments:
+            flip_v, flip_h: flips glyphs vertically or horizontally
         """
+        self._flip_glyphs_v = flip_v
+        self._flip_glyphs_h = flip_h
+
         with tempfile.TemporaryDirectory() as dir:
             font = fontforge.open(input_address)
             file_address = os.path.join(dir, input_address + '._generated.svg')
@@ -31,9 +45,27 @@ class FontProcessor:
                 glyphs = BeautifulSoup(xml_data, 'xml').find_all('glyph')
 
         self.glyphs = [
-            Glyph(item.get('d'), item.get('glyph_name'), item.get('unicode'))
+            Glyph(item.get('d'), item.get('glyph-name'), item.get('unicode'))
             for item in glyphs
         ]
+
+    @classmethod
+    def fromUrl(cls, url: str, extension: str = None):
+        """Opens font by URL and reads all the glyphs in it. Extension of the font
+        will be identified automatically from the URL. You can type it manually otherwise.
+        """
+        response = requests.get(url)
+
+        extension = extension or url.split('.')[-1]
+
+        with tempfile.TemporaryDirectory() as dir:
+            fname = os.path.join(dir, 'font.' + extension)
+            with open(fname, 'wb') as fp:
+                fp.write(response.content)
+
+            instance = cls(fname)
+
+        return instance
 
     def _fill_into_bb(self, object_bb: tuple, rect_sizes: tuple):
         """Calculates translation and scaling for that object with given
@@ -61,6 +93,14 @@ class FontProcessor:
 
         translate_x = -src_obj_xmin * scale_x + (im_w - dst_obj_w) / 2
         translate_y = -src_obj_ymin * scale_y + (im_h - dst_obj_h) / 2
+
+        if self._flip_glyphs_h:
+            scale_x *= -1
+            translate_x += dst_obj_w
+
+        if self._flip_glyphs_v:
+            scale_y *= -1
+            translate_y += dst_obj_h
 
         return (
             (round(translate_x, 5), round(translate_y, 5)),
@@ -118,16 +158,19 @@ class FontProcessor:
 
         def get_paths_bounding_box(paths):
             for i, path in enumerate(paths):
-                if i == 0:
-                    # Initialise the overall min-max with the first path
-                    xmin, xmax, ymin, ymax = path.bbox()
-                else:
-                    # Expand bounds to match path bounds if needed
-                    p_xmin, p_xmax, p_ymin, p_ymax = path.bbox()
-                    xmin = p_xmin if p_xmin < xmin else xmin
-                    xmax = p_xmax if p_xmax > xmax else xmax
-                    ymin = p_ymin if p_ymin < ymin else ymin
-                    ymax = p_ymax if p_ymax > ymax else ymax
+                try:
+                    if i == 0:
+                        # Initialise the overall min-max with the first path
+                        xmin, xmax, ymin, ymax = path.bbox()
+                    else:
+                        # Expand bounds to match path bounds if needed
+                        p_xmin, p_xmax, p_ymin, p_ymax = path.bbox()
+                        xmin = p_xmin if p_xmin < xmin else xmin
+                        xmax = p_xmax if p_xmax > xmax else xmax
+                        ymin = p_ymin if p_ymin < ymin else ymin
+                        ymax = p_ymax if p_ymax > ymax else ymax
+                except ValueError:
+                    raise EmptyPathError
 
             return xmax, xmin, ymax, ymin
 
@@ -145,12 +188,15 @@ class FontProcessor:
         with tempfile.TemporaryDirectory() as dir:
             bounding_box = self._get_glyph_bb(glyph.d, os.path.join(dir, fname + '.svg'))
             svg_text = self._get_svg_boilerplate(glyph.d, bounding_box)
+            print(svg_text)
             self._svg2png(glyph.d, svg_text, image_w, image_h, fname)
 
     def glyph2array(self, glyph: Glyph, image_w: int = 128, image_h: int = 128):
         """Converts a given glyph to a pyplot image array with given size.
         Arguments is the same as in Font.glyph2png.
         """
-        glyph_fname = (glyph.unicode or '?').encode().hex() + '.png'
-        self.glyph2png(glyph, glyph_fname, image_w, image_h)
-        return plt.imread(glyph_fname)
+        with tempfile.TemporaryDirectory() as dir:
+            glyph_fname = (glyph.unicode or '?').encode().hex() + '.png'
+            glyph_path = os.path.join(dir, glyph_fname)
+            self.glyph2png(glyph, glyph_path, image_w, image_h)
+            return plt.imread(glyph_path)
