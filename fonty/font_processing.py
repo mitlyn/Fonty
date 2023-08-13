@@ -16,7 +16,8 @@ from bs4 import BeautifulSoup
 import errors
 
 
-Glyph = namedtuple('Glyph', ['d', 'glyph_name', 'unicode'])
+Glyph = namedtuple('Glyph', ['d', 'glyph_name', 'unicode', 'attrs'])
+GLYPH_FETCH_ATTRS = ['d', 'glyph-name', 'unicode']
 
 
 class EmptyPathError(errors.FontyError):
@@ -44,10 +45,17 @@ class FontProcessor:
                 xml_data = fp.read()
                 glyphs = BeautifulSoup(xml_data, 'xml').find_all('glyph')
 
-        self.glyphs = [
-            Glyph(item.get('d'), item.get('glyph-name'), item.get('unicode'))
-            for item in glyphs
-        ]
+        def _convert_to_Glyph(item):
+            fetched_attributes = [item.get(attr) for attr in GLYPH_FETCH_ATTRS]
+            all_attribute_keys = set(item.attrs.keys())
+            rest_attributes = {
+                key: item.attrs[key]
+                for key in all_attribute_keys - set(GLYPH_FETCH_ATTRS)
+            }
+
+            return Glyph(*fetched_attributes, rest_attributes)
+
+        self.glyphs = [_convert_to_Glyph(item) for item in glyphs]
 
     @classmethod
     def fromUrl(cls, url: str, extension: str = None):
