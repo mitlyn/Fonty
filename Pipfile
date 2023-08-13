@@ -9,6 +9,8 @@ svgpathtools = "*"
 freetype-py = "*"
 lxml = "*"
 beautifulsoup4 = "*"
+cairosvg = "*"
+matplotlib = "*"
 
 [dev-packages]
 
