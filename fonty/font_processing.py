@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 
 import requests
@@ -36,13 +37,12 @@ class FontProcessor:
         self._flip_glyphs_h = flip_h
 
         self.temp_dir = tempfile.TemporaryDirectory()
+        self._svg_font_address = os.path.join(self.temp_dir.name, input_address + '._generated.svg')
 
         font = fontforge.open(input_address)
-        file_address = os.path.join(self.temp_dir, input_address + '._generated.svg')
-        font.generate(file_address)
-        font.close()
-
-        with open(file_address, mode='r') as fp:
+        font.generate(self._svg_font_address)
+        self._font = font
+        with open(self._svg_font_address, mode='r') as fp:
             xml_data = fp.read()
             glyphs = BeautifulSoup(xml_data, 'xml').find_all('glyph')
 
@@ -57,6 +57,16 @@ class FontProcessor:
             return Glyph(*fetched_attributes, rest_attributes)
 
         self.glyphs = [_convert_to_Glyph(item) for item in glyphs]
+
+    def __del__(self):
+        self._font.close()
+
+    def save_svg_font(self, dst: str = None):
+        """Saves a generated SVG font file to a given destination. Original file name will
+        be remained of `dst` is None.
+        """
+        dst = dst or self._font.path.split('/')[-1]
+        shutil.copy(self._svg_font_address, dst)
 
     @classmethod
     def fromUrl(cls, url: str, extension: str = None):
@@ -194,7 +204,7 @@ class FontProcessor:
     def glyph2png(self, glyph: Glyph, fname: str, image_w: int = 128, image_h: int = 128):
         """Renders a glyph to PNG image with the given size.
         """
-        bounding_box = self._get_glyph_bb(glyph.d, os.path.join(self.temp_dir, fname + '.svg'))
+        bounding_box = self._get_glyph_bb(glyph.d, os.path.join(self.temp_dir.name, fname + '.svg'))
         svg_text = self._get_svg_boilerplate(glyph.d, bounding_box)
         print(svg_text)
         self._svg2png(glyph.d, svg_text, image_w, image_h, fname)
@@ -204,6 +214,6 @@ class FontProcessor:
         Arguments is the same as in Font.glyph2png.
         """
         glyph_fname = (glyph.unicode or '?').encode().hex() + '.png'
-        glyph_path = os.path.join(self.temp_dir, glyph_fname)
+        glyph_path = os.path.join(self.temp_dir.name, glyph_fname)
         self.glyph2png(glyph, glyph_path, image_w, image_h)
         return plt.imread(glyph_path)
