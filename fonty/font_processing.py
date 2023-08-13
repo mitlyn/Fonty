@@ -86,13 +86,13 @@ class FontProcessor:
 
         return instance
 
-    def _fill_into_bb(self, object_bb: tuple, rect_sizes: tuple):
+    def _fill_into_bbox(self, object_bbox: tuple, rect_sizes: tuple):
         """Calculates translation and scaling for that object with given
         xmax, xmin, ymax, ymin, so that it will be filled and centered inside
         a rectangle with given width and height.
         """
 
-        src_obj_xmax, src_obj_xmin, src_obj_ymax, src_obj_ymin = object_bb
+        src_obj_xmax, src_obj_xmin, src_obj_ymax, src_obj_ymin = object_bbox
         im_w, im_h = rect_sizes
 
         src_obj_w = abs(src_obj_xmax - src_obj_xmin)
@@ -138,7 +138,7 @@ class FontProcessor:
         image_size = f'width=\'{image_w}\' height=\'{image_h}\''
 
         if bounding_box:
-            translation, scaling = self._fill_into_bb(bounding_box, (image_w, image_h))
+            translation, scaling = self._fill_into_bbox(bounding_box, (image_w, image_h))
         else:
             translation, scaling = (0, 0), (1, 1)
 
@@ -173,7 +173,7 @@ class FontProcessor:
         with open(dst_file, mode='wb+') as fp:
             fp.write(png_data)
 
-    def _get_glyph_bb(self, path: str, fname: str) -> tuple:
+    def _get_glyph_bbox(self, path: str, fname: str) -> tuple:
 
         def get_paths_bounding_box(paths):
             for i, path in enumerate(paths):
@@ -204,7 +204,7 @@ class FontProcessor:
     def glyph2png(self, glyph: Glyph, fname: str, image_w: int = 128, image_h: int = 128):
         """Renders a glyph to PNG image with the given size.
         """
-        bounding_box = self._get_glyph_bb(glyph.d, os.path.join(self.temp_dir.name, fname + '.svg'))
+        bounding_box = self._get_glyph_bbox(glyph.d, os.path.join(self.temp_dir.name, fname + '.svg'))
         svg_text = self._get_svg_boilerplate(glyph.d, bounding_box)
         print(svg_text)
         self._svg2png(glyph.d, svg_text, image_w, image_h, fname)
