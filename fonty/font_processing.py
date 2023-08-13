@@ -35,15 +35,16 @@ class FontProcessor:
         self._flip_glyphs_v = flip_v
         self._flip_glyphs_h = flip_h
 
-        with tempfile.TemporaryDirectory() as dir:
-            font = fontforge.open(input_address)
-            file_address = os.path.join(dir, input_address + '._generated.svg')
-            font.generate(file_address)
-            font.close()
+        self.temp_dir = tempfile.TemporaryDirectory()
 
-            with open(file_address, mode='r') as fp:
-                xml_data = fp.read()
-                glyphs = BeautifulSoup(xml_data, 'xml').find_all('glyph')
+        font = fontforge.open(input_address)
+        file_address = os.path.join(self.temp_dir, input_address + '._generated.svg')
+        font.generate(file_address)
+        font.close()
+
+        with open(file_address, mode='r') as fp:
+            xml_data = fp.read()
+            glyphs = BeautifulSoup(xml_data, 'xml').find_all('glyph')
 
         def _convert_to_Glyph(item):
             fetched_attributes = [item.get(attr) for attr in GLYPH_FETCH_ATTRS]
@@ -193,18 +194,16 @@ class FontProcessor:
     def glyph2png(self, glyph: Glyph, fname: str, image_w: int = 128, image_h: int = 128):
         """Renders a glyph to PNG image with the given size.
         """
-        with tempfile.TemporaryDirectory() as dir:
-            bounding_box = self._get_glyph_bb(glyph.d, os.path.join(dir, fname + '.svg'))
-            svg_text = self._get_svg_boilerplate(glyph.d, bounding_box)
-            print(svg_text)
-            self._svg2png(glyph.d, svg_text, image_w, image_h, fname)
+        bounding_box = self._get_glyph_bb(glyph.d, os.path.join(self.temp_dir, fname + '.svg'))
+        svg_text = self._get_svg_boilerplate(glyph.d, bounding_box)
+        print(svg_text)
+        self._svg2png(glyph.d, svg_text, image_w, image_h, fname)
 
     def glyph2array(self, glyph: Glyph, image_w: int = 128, image_h: int = 128):
         """Converts a given glyph to a pyplot image array with given size.
         Arguments is the same as in Font.glyph2png.
         """
-        with tempfile.TemporaryDirectory() as dir:
-            glyph_fname = (glyph.unicode or '?').encode().hex() + '.png'
-            glyph_path = os.path.join(dir, glyph_fname)
-            self.glyph2png(glyph, glyph_path, image_w, image_h)
-            return plt.imread(glyph_path)
+        glyph_fname = (glyph.unicode or '?').encode().hex() + '.png'
+        glyph_path = os.path.join(self.temp_dir, glyph_fname)
+        self.glyph2png(glyph, glyph_path, image_w, image_h)
+        return plt.imread(glyph_path)
