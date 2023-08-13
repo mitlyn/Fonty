@@ -7,6 +7,8 @@ name = "pypi"
 jupyter = "*"
 svgpathtools = "*"
 freetype-py = "*"
+lxml = "*"
+beautifulsoup4 = "*"
 
 [dev-packages]
 
