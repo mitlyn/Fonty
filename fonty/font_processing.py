@@ -271,7 +271,7 @@ class Glyphset:
             ... all other arguments will be passed into Glyphset.to_dataset
         """
         df = self.to_dataset(*args, **kwargs)
-        image_length = len(df[0]['image'])
+        image_length = len(df[0]['image'].reshape(-1))
 
         with open(faddr, mode='w') as fp:
 
@@ -281,7 +281,7 @@ class Glyphset:
                 writer.writerow([
                     'letter',
                     *include_parameters,
-                    *[i for i in range(image_length)]
+                    *[i + 1 for i in range(image_length)]
                 ])
 
             for row in df:
