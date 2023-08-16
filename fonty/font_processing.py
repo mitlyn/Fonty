@@ -75,7 +75,7 @@ class FontProcessor:
         shutil.copy(self._svg_font_address, dst)
 
     @classmethod
-    def fromUrl(cls, url: str, extension: str = None):
+    def fromUrl(cls, url: str, extension: str = None, *args, **kwargs):
         """Opens font by URL and reads all the glyphs in it. Extension of the font
         will be identified automatically from the URL. You can type it manually otherwise.
         """
@@ -88,7 +88,7 @@ class FontProcessor:
             with open(fname, 'wb') as fp:
                 fp.write(response.content)
 
-            instance = cls(fname)
+            instance = cls(fname, *args, **kwargs)
 
         return instance
 
@@ -132,7 +132,6 @@ class FontProcessor:
 
         if bounding_box:
             vector_xmax, vector_xmin, vector_ymax, vector_ymin = bounding_box
-            print(bounding_box)
             translation, scaling = self._calculate_transform(
                 vector_width=(vector_xmax - vector_xmin),
                 image_w=image_w, image_h=image_h,
@@ -212,7 +211,6 @@ class FontProcessor:
             image_w=image_w, image_h=image_h,
             glyph_size_proportion=glyph_size_proportion
         )
-        print(svg_text)
         self._svg2png(glyph.d, svg_text, image_w, image_h, fname)
 
     def glyph2array(self, glyph: Glyph, *args, **kwargs):
