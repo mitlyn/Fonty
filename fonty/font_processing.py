@@ -41,7 +41,13 @@ class FontProcessor:
 
         font = fontforge.open(input_address)
         font.generate(self._svg_font_address)
-        self._font = font
+
+        self._cap_height = font.capHeight
+
+        # might fetch baselines from font
+        self._baseline_y = 0
+        self._baseline_x = 0
+
         with open(self._svg_font_address, mode='r') as fp:
             xml_data = fp.read()
             glyphs = BeautifulSoup(xml_data, 'xml').find_all('glyph')
@@ -86,49 +92,40 @@ class FontProcessor:
 
         return instance
 
-    def _fill_into_bbox(self, object_bbox: tuple, rect_sizes: tuple):
-        """Calculates translation and scaling for that object with given
-        xmax, xmin, ymax, ymin, so that it will be filled and centered inside
-        a rectangle with given width and height.
-        """
+    def _calculate_transform(
+        self,
+        vector_width: int,
+        image_h: int, image_w: int,
+        glyph_size_proportion: int
+    ):
+        vector_ymin, vector_ymax = self._baseline_y, self._cap_height
+        vector_xmin = self._baseline_x
 
-        src_obj_xmax, src_obj_xmin, src_obj_ymax, src_obj_ymin = object_bbox
-        im_w, im_h = rect_sizes
+        glyph_height = (glyph_size_proportion * image_h) / (glyph_size_proportion + 2)
+        padding_y = (image_h - glyph_height) / 2
 
-        src_obj_w = abs(src_obj_xmax - src_obj_xmin)
-        src_obj_h = abs(src_obj_ymax - src_obj_ymin)
+        glyph_ymin, glyph_ymax = padding_y, padding_y + glyph_height
 
-        if src_obj_w > src_obj_h:
-            scale_x = im_w / src_obj_w
-            scale_y = scale_x
-            dst_obj_w = src_obj_w * scale_x
-            dst_obj_h = src_obj_h * scale_y
+        translating_y = glyph_ymin - vector_ymin
+        scaling = (glyph_ymax - glyph_ymin) / (vector_ymax - vector_ymin)
 
-        else:
-            scale_y = im_h / src_obj_h
-            scale_x = scale_y
-            dst_obj_w = src_obj_w * scale_x
-            dst_obj_h = src_obj_h * scale_y
-
-        translate_x = -src_obj_xmin * scale_x + (im_w - dst_obj_w) / 2
-        translate_y = -src_obj_ymin * scale_y + (im_h - dst_obj_h) / 2
-
-        if self._flip_glyphs_h:
-            scale_x *= -1
-            translate_x += dst_obj_w
-
-        if self._flip_glyphs_v:
-            scale_y *= -1
-            translate_y += dst_obj_h
+        padding_x = (image_w - vector_width * scaling) / 2
+        glyph_xmin = (image_w - padding_x) / 2
+        glyph_width = vector_width * scaling
+        translating_x = glyph_xmin - vector_xmin + (image_w - glyph_width) / 2
 
         return (
-            (round(translate_x, 5), round(translate_y, 5)),
-            (round(scale_x, 5), round(scale_y, 5))
+            (image_w - translating_x, image_h - translating_y),
+            (
+                scaling if not self._flip_glyphs_h else -scaling,
+                scaling if not self._flip_glyphs_v else -scaling
+            )
         )
 
     def _get_svg_boilerplate(
         self,
         path: str,
+        glyph_size_proportion: int = 1,
         bounding_box: tuple = None,
         image_w: str = 128, image_h: str = 128,
         background: str = None, fill: str = None
@@ -138,7 +135,12 @@ class FontProcessor:
         image_size = f'width=\'{image_w}\' height=\'{image_h}\''
 
         if bounding_box:
-            translation, scaling = self._fill_into_bbox(bounding_box, (image_w, image_h))
+            vector_xmax, vector_xmin, vector_ymax, vector_ymin = bounding_box
+            translation, scaling = self._calculate_transform(
+                vector_width=(vector_xmax - vector_xmin),
+                image_w=image_w, image_h=image_h,
+                glyph_size_proportion=glyph_size_proportion
+            )
         else:
             translation, scaling = (0, 0), (1, 1)
 
@@ -201,19 +203,26 @@ class FontProcessor:
 
         return get_paths_bounding_box(paths)
 
-    def glyph2png(self, glyph: Glyph, fname: str, image_w: int = 128, image_h: int = 128):
+    def glyph2png(
+        self,
+        glyph: Glyph, fname: str, image_w: int = 128, image_h: int = 128, glyph_size_proportion: int = 1
+    ):
         """Renders a glyph to PNG image with the given size.
         """
         bounding_box = self._get_glyph_bbox(glyph.d, os.path.join(self.temp_dir.name, fname + '.svg'))
-        svg_text = self._get_svg_boilerplate(glyph.d, bounding_box)
+        svg_text = self._get_svg_boilerplate(
+            path=glyph.d, bounding_box=bounding_box,
+            image_w=image_w, image_h=image_h,
+            glyph_size_proportion=glyph_size_proportion
+        )
         print(svg_text)
         self._svg2png(glyph.d, svg_text, image_w, image_h, fname)
 
-    def glyph2array(self, glyph: Glyph, image_w: int = 128, image_h: int = 128):
+    def glyph2array(self, glyph: Glyph, *args, **kwargs):
         """Converts a given glyph to a pyplot image array with given size.
         Arguments is the same as in Font.glyph2png.
         """
         glyph_fname = (glyph.unicode or '?').encode().hex() + '.png'
         glyph_path = os.path.join(self.temp_dir.name, glyph_fname)
-        self.glyph2png(glyph, glyph_path, image_w, image_h)
+        self.glyph2png(glyph, fname=glyph_path, *args, **kwargs)
         return plt.imread(glyph_path)
