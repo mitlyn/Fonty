@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 
 from bs4 import BeautifulSoup
 
+import csv
+
 import errors
 
 
@@ -218,3 +220,66 @@ class FontProcessor:
         glyph_path = os.path.join(self.temp_dir.name, glyph_fname)
         self.glyph2png(glyph, fname=glyph_path, *args, **kwargs)
         return plt.imread(glyph_path)
+
+    def glyphset_from_unicode_subset(self, unicode_subset: list):
+        """Generates new glyphset on the given unicode letters.
+        """
+        glyphs = [
+            glyph
+            for glyph in self.glyphs
+            if glyph.unicode in set(unicode_subset)
+        ]
+
+        return Glyphset(glyphs, unicode_subset, self)
+
+
+class Glyphset:
+
+    def __init__(self, glyphs, letters, font_processor):
+        self.glyphs = glyphs
+        self.letters = letters
+        self.font_processor = font_processor
+
+    def to_dataset(self, *args, **kwargs):
+        """Returns array of dataset for the glyphset. All the parameters will be
+        passed to FontProcessor.glyph2png.
+        """
+        return [
+            {
+                'glyph': glyph,
+                'letter': letter,
+                'image': self.font_processor.glyph2array(glyph, *args, **kwargs)
+            }
+            for glyph, letter
+            in zip(self.glyphs, self.letters)
+        ]
+
+    def to_csv(self, faddr: int, include_parameters: list = None, headers: bool = True, *args, **kwargs):
+        """Stores rendered glyphset to CSV file.
+
+        Arguments:
+            include_parameters: specify list of parameters of Glyph that will be
+                stored in CSV.
+            headers (bool)
+            ... all other arguments will be passed into FontProcessor.glyph2png
+        """
+        df = self.to_dataset(*args, **kwargs)
+        image_length = len(df[0]['image'])
+
+        with open(faddr, mode='w') as fp:
+
+            writer = csv.writer(fp, quoting=csv.QUOTE_NONNUMERIC)
+
+            if headers:
+                writer.writerow([
+                    'letter',
+                    *include_parameters,
+                    *[i for i in range(image_length)]
+                ])
+
+            for row in df:
+                writer.writerow([
+                    row['letter'],
+                    *[getattr(row['glyph'], attr) for attr in include_parameters],
+                    *row['image'].reshape(-1)
+                ])
