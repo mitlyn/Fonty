@@ -99,7 +99,6 @@ class FontProcessor:
         glyph_size_proportion: int
     ):
         vector_ymin, vector_ymax = self._baseline_y, self._cap_height
-        vector_xmin = self._baseline_x
 
         glyph_height = (glyph_size_proportion * image_h) / (glyph_size_proportion + 2)
         padding_y = (image_h - glyph_height) / 2
@@ -110,12 +109,9 @@ class FontProcessor:
         scaling = (glyph_ymax - glyph_ymin) / (vector_ymax - vector_ymin)
 
         padding_x = (image_w - vector_width * scaling) / 2
-        glyph_xmin = (image_w - padding_x) / 2
-        glyph_width = vector_width * scaling
-        translating_x = glyph_xmin - vector_xmin + (image_w - glyph_width) / 2
 
         return (
-            (image_w - translating_x, image_h - translating_y),
+            (padding_x, image_h - translating_y),
             (
                 scaling if not self._flip_glyphs_h else -scaling,
                 scaling if not self._flip_glyphs_v else -scaling
@@ -136,6 +132,7 @@ class FontProcessor:
 
         if bounding_box:
             vector_xmax, vector_xmin, vector_ymax, vector_ymin = bounding_box
+            print(bounding_box)
             translation, scaling = self._calculate_transform(
                 vector_width=(vector_xmax - vector_xmin),
                 image_w=image_w, image_h=image_h,
