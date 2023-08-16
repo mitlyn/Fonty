@@ -64,9 +64,6 @@ class FontProcessor:
 
         self.glyphs = [_convert_to_Glyph(item) for item in glyphs]
 
-    def __del__(self):
-        self._font.close()
-
     def save_svg_font(self, dst: str = None):
         """Saves a generated SVG font file to a given destination. Original file name will
         be remained of `dst` is None.
