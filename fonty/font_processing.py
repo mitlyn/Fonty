@@ -240,28 +240,35 @@ class Glyphset:
         self.letters = letters
         self.font_processor = font_processor
 
-    def to_dataset(self, *args, **kwargs):
+    def to_dataset(self, one_channel_image: bool = True, *args, **kwargs):
         """Returns array of dataset for the glyphset. All the parameters will be
         passed to FontProcessor.glyph2png.
         """
+        def to_image(glyph):
+            array = self.font_processor.glyph2array(glyph, *args, **kwargs)
+            return array[:, :, 1] if one_channel_image else array
+
         return [
             {
                 'glyph': glyph,
                 'letter': letter,
-                'image': self.font_processor.glyph2array(glyph, *args, **kwargs)
+                'image': to_image(glyph)
             }
             for glyph, letter
             in zip(self.glyphs, self.letters)
         ]
 
-    def to_csv(self, faddr: int, include_parameters: list = None, headers: bool = True, *args, **kwargs):
+    def to_csv(
+        self, faddr: int, include_parameters: list = None, headers: bool = True,
+        *args, **kwargs
+    ):
         """Stores rendered glyphset to CSV file.
 
         Arguments:
             include_parameters: specify list of parameters of Glyph that will be
                 stored in CSV.
             headers (bool)
-            ... all other arguments will be passed into FontProcessor.glyph2png
+            ... all other arguments will be passed into Glyphset.to_dataset
         """
         df = self.to_dataset(*args, **kwargs)
         image_length = len(df[0]['image'])
