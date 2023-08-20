@@ -17,10 +17,17 @@ from bs4 import BeautifulSoup
 import csv
 
 import errors
+import panose1
 
 
 Glyph = namedtuple('Glyph', ['d', 'glyph_name', 'unicode', 'attrs'])
 GLYPH_FETCH_ATTRS = ['d', 'glyph-name', 'unicode']
+
+
+ALPHABETS = {
+    'ua': [*'АаБбВвГгҐґДдЕеЄєЖжЗзИиІіЇїЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЬьЮюЯя'],
+    'en': [*'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz']
+}
 
 
 class EmptyPathError(errors.FontyError):
@@ -29,7 +36,7 @@ class EmptyPathError(errors.FontyError):
 
 class FontProcessor:
 
-    def __init__(self, input_address: str, flip_v: bool = False, flip_h: bool = False):
+    def __init__(self, input_address: str, flip_v: bool = False, flip_h: bool = False, temp_dir=None):
         """Opens font and reads all the glyphs in it.
 
         Arguments:
@@ -38,11 +45,13 @@ class FontProcessor:
         self._flip_glyphs_v = flip_v
         self._flip_glyphs_h = flip_h
 
-        self.temp_dir = tempfile.TemporaryDirectory()
+        self.temp_dir = temp_dir or tempfile.TemporaryDirectory()
         self._svg_font_address = os.path.join(self.temp_dir.name, input_address + '._generated.svg')
 
         font = fontforge.open(input_address)
         font.generate(self._svg_font_address)
+
+        self._font = font
 
         self._cap_height = font.capHeight
 
@@ -66,6 +75,26 @@ class FontProcessor:
 
         self.glyphs = [_convert_to_Glyph(item) for item in glyphs]
 
+    @property
+    def features(self):
+        features = {
+            feature[4:]: getattr(self._font, feature)
+            for feature
+            in dir(self._font)
+            if feature[:4] == 'os2_' and feature != 'os2_panose'
+        }
+
+        return {
+            **features,
+            'panose': panose1.digits_to_features(self._font.os2_panose),
+            'family_name': self._font.familyname,
+            'font_name': self._font.fullname
+        }
+
+    def __del__(self):
+        self._font.close()
+        self.temp_dir.close()
+
     def save_svg_font(self, dst: str = None):
         """Saves a generated SVG font file to a given destination. Original file name will
         be remained of `dst` is None.
@@ -82,12 +111,12 @@ class FontProcessor:
 
         extension = extension or url.split('.')[-1]
 
-        with tempfile.TemporaryDirectory() as dir:
-            fname = os.path.join(dir, 'font.' + extension)
-            with open(fname, 'wb') as fp:
-                fp.write(response.content)
+        temp_dir = tempfile.TemporaryDirectory()
+        fname = os.path.join(temp_dir.name, 'font.' + extension)
+        with open(fname, 'wb') as fp:
+            fp.write(response.content)
 
-            instance = cls(fname, *args, **kwargs)
+        instance = cls(fname, temp_dir=temp_dir, *args, **kwargs)
 
         return instance
 
@@ -290,3 +319,16 @@ class Glyphset:
                     *[getattr(row['glyph'], attr) for attr in include_parameters],
                     *row['image'].reshape(-1)
                 ])
+
+    def to_json(self):
+        return {
+            **self.font_processor.features,
+            'glyphs': [
+                {
+                    'letter': letter,
+                    'path': glyph.d
+                }
+                for glyph, letter
+                in zip(self.glyphs, self.letters)
+            ]
+        }
