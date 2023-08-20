@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
 
 import csv
+import itertools
 
 import errors
 import panose1
@@ -26,8 +27,21 @@ GLYPH_FETCH_ATTRS = ['d', 'glyph-name', 'unicode']
 
 ALPHABETS = {
     'ua': [*'АаБбВвГгҐґДдЕеЄєЖжЗзИиІіЇїЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЬьЮюЯя'],
-    'en': [*'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz']
+    'en': [*'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz'],
+    'puncts': [*',.;:\'"()/[]{}\\/!@#$%^&*?-+=*<>'],
+    'digits': '0123456789'
 }
+
+
+def get_alphabet(name: str = None):
+    """Returns alphabet from ALPHABETS. Returns all alphabets if no arguments
+    provided.
+    """
+    if name != 'all':
+        return ALPHABETS[name]
+
+    else:
+        return list(itertools.chain.from_iterable(ALPHABETS.values()))
 
 
 class EmptyPathError(errors.FontyError):
@@ -93,7 +107,7 @@ class FontProcessor:
 
     def __del__(self):
         self._font.close()
-        self.temp_dir.close()
+        del self.temp_dir
 
     def save_svg_font(self, dst: str = None):
         """Saves a generated SVG font file to a given destination. Original file name will
@@ -253,13 +267,15 @@ class FontProcessor:
     def glyphset_from_unicode_subset(self, unicode_subset: list):
         """Generates new glyphset on the given unicode letters.
         """
+        unique_letters = list(set(unicode_subset))
+
         glyphs = [
             glyph
             for glyph in self.glyphs
-            if glyph.unicode in set(unicode_subset)
+            if glyph.unicode in unique_letters
         ]
 
-        return Glyphset(glyphs, unicode_subset, self)
+        return Glyphset(glyphs, unique_letters, self)
 
 
 class Glyphset:

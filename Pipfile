@@ -11,6 +11,7 @@ lxml = "*"
 beautifulsoup4 = "*"
 cairosvg = "*"
 matplotlib = "*"
+pymongo = "*"
 
 [dev-packages]
 
