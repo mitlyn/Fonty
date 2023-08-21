@@ -1,10 +1,9 @@
-import torch
+import torch, torch.nn as nn, torch.optim as op
 import lightning as L
-import torch.nn as nn
-import torch.optim as op
 
 from model.blocks import Generator, Discriminator, GANLoss
-from model.utils import Options, setInit
+from model.types import TrainBundle, Options
+from model.utils import setInit
 
 # TODO: callbacks, learning rate schedulers
 # TODO: metrics
@@ -18,13 +17,13 @@ class Model(L.LightningModule):
 
         self.automatic_optimization = False
 
-        self.G = Generator(opt.ngf, n_blocks=6, dropout=opt.G_dropout)
+        self.G = Generator(opt.G_filters, blocks=6, dropout=opt.G_dropout)
         setInit(self.G, opt.init_type, opt.init_gain)
 
-        self.Dc = Discriminator(2, opt.ndf, opt.D_layers)
+        self.Dc = Discriminator(2, opt.D_filters, opt.D_layers)
         setInit(self.Dc, opt.init_type, opt.init_gain)
 
-        self.Ds = Discriminator(opt.refs + 1, opt.ndf, opt.D_layers)
+        self.Ds = Discriminator(opt.refs + 1, opt.D_filters, opt.D_layers)
         setInit(self.Ds, opt.init_type, opt.init_gain)
 
         # Loss Functions
@@ -36,15 +35,15 @@ class Model(L.LightningModule):
         self.LG = GANLoss(opt.gan_mode).to(self.device)
 
         # Optimizers
-        self.optimizer_G = op.Adam(self.G.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-        self.optimizer_D_style = op.Adam(self.Ds.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-        self.optimizer_D_content = op.Adam(self.Dc.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+        self.G_optimizer = op.Adam(self.G.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+        self.Ds_optimizer = op.Adam(self.Ds.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+        self.Dc_optimizer = op.Adam(self.Dc.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
 
-    def set_input(self, data):
-        self.style_images = data['style'].to(self.device).view(1, -1, 64, 64)
-        self.target_images = data['target'].to(self.device).view(1, -1, 64, 64)
-        self.content_images = data['content'].to(self.device).view(1, -1, 64, 64)
+    def set_input(self, data: TrainBundle):
+        self.style = data.style.to(self.device).view(1, -1, 64, 64)
+        self.target = data.target.to(self.device).view(1, -1, 64, 64)
+        self.content = data.content.to(self.device).view(1, -1, 64, 64)
 
 
     def toggle_grads(self, state: bool, *nets):
@@ -54,11 +53,11 @@ class Model(L.LightningModule):
 
 
     def configure_optimizers(self):
-        return [self.optimizer_G, self.optimizer_D_content, self.optimizer_D_style], []
+        return [self.G_optimizer, self.Dc_optimizer, self.Ds_optimizer], []
 
 
     def forward(self):
-        self.result = self.G((self.content_images, self.style_images))
+        self.result = self.G((self.content, self.style))
 
 
     def D_loss(self, real_images, fake_images, discriminator):
@@ -83,8 +82,8 @@ class Model(L.LightningModule):
 
     def D_back(self):
         """Calculate Discriminator loss"""
-        self.loss_D_content = self.D_loss([self.content_images, self.target_images],  [self.content_images, self.result], self.Dc)
-        self.loss_D_style = self.D_loss([self.style_images, self.target_images], [self.style_images, self.result], self.Ds)
+        self.loss_D_content = self.D_loss([self.content, self.target],  [self.content, self.result], self.Dc)
+        self.loss_D_style = self.D_loss([self.style, self.target], [self.style, self.result], self.Ds)
         self.loss_D = self.loss_D_content * self.lambda_content + self.loss_D_style * self.lambda_style
 
         self.loss_D.backward()
@@ -93,12 +92,12 @@ class Model(L.LightningModule):
     def G_back(self):
         """Calculate Generator loss (L1 & GAN)"""
         # First, G(A) should fake the discriminator
-        self.loss_G_content = self.G_loss([self.content_images, self.result], self.Dc)
-        self.loss_G_style = self.G_loss([self.style_images, self.result], self.Ds)
+        self.loss_G_content = self.G_loss([self.content, self.result], self.Dc)
+        self.loss_G_style = self.G_loss([self.style, self.result], self.Ds)
         self.loss_G_GAN = self.lambda_content * self.loss_G_content + self.lambda_style * self.loss_G_style
 
         # Second, G(A) = B
-        self.loss_G_L1 = self.L1(self.result, self.target_images)
+        self.loss_G_L1 = self.L1(self.result, self.target)
         self.loss_G = self.loss_G_GAN + self.loss_G_L1 * self.lambda_L1
 
         self.loss_G.backward()
@@ -110,17 +109,17 @@ class Model(L.LightningModule):
 
         # Update D
         self.toggle_grads(True, self.Dc, self.Ds)
-        self.optimizer_D_content.zero_grad()
-        self.optimizer_D_style.zero_grad()
+        self.Dc_optimizer.zero_grad()
+        self.Ds_optimizer.zero_grad()
         self.D_back()
-        self.optimizer_D_content.step()
-        self.optimizer_D_style.step()
+        self.Dc_optimizer.step()
+        self.Ds_optimizer.step()
 
         # Update G
         self.toggle_grads(False, self.Dc, self.Ds)
-        self.optimizer_G.zero_grad()
+        self.G_optimizer.zero_grad()
         self.G_back()
-        self.optimizer_G.step()
+        self.G_optimizer.step()
 
 
     def on_train_epoch_end(self) -> None:

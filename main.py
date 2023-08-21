@@ -2,12 +2,13 @@
 
 import pandas as pd
 
+from torch import Tensor
 from lightning import Trainer
-from torch import Tensor, no_grad
 from torch.utils.data import DataLoader
 
-from model.model import Model, Options
-from model.utils import show, showMany
+from model.model import Model
+from model.types import TrainBundle, Options
+from model.utils import apply, show, showMany
 
 # %%---------------------------------------------------------------------------%
 
@@ -31,14 +32,7 @@ Y = os_en
 
 # %%---------------------------------------------------------------------------%
 
-data = [
-    {
-        "content": x,
-        "target": y,
-        "style": S[:5],
-    }
-    for x, y in zip(X, Y)
-]
+data = [TrainBundle(content=x, target=y, style=S[:5]) for x, y in zip(X, Y)]
 
 loader = DataLoader(data, batch_size=1)
 
@@ -52,7 +46,7 @@ net = Model(opt)
 
 # %%---------------------------------------------------------------------------%
 
-trainer = Trainer(max_epochs=10)
+trainer = Trainer(max_epochs=100)
 
 # %%---------------------------------------------------------------------------%
 
@@ -60,29 +54,15 @@ trainer.fit(net, loader)
 
 # %%---------------------------------------------------------------------------%
 
-x = loader.dataset[0]
-showMany(x['content'], x['target'])
+X = loader.dataset[0]
+showMany(X.content, X.target)
 
 # %%---------------------------------------------------------------------------%
 
-x["content"] = x["content"].view(1,-1,64,64).cuda()
-x["style"] = x["style"].view(1,-1,64,64).cuda()
-net.cuda()
-
-# %%---------------------------------------------------------------------------%
-
-net.eval()
-with no_grad():
-    y = net.G((x["content"], x["style"]))
-
-net.train()
-
-# %%---------------------------------------------------------------------------%
-
-Y = y.cpu().detach().view(64,64)
+Y = apply(net, X)
 
 # %%---------------------------------------------------------------------------%
 
 show(Y)
 
-# %%
+# %%---------------------------------------------------------------------------%

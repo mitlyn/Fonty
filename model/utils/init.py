@@ -1,13 +1,15 @@
 from torch import nn
 
+# *----------------------------------------------------------------------------*
+
 
 def setInit(net, init_type='normal', init_gain=0.02):
     """Initialize network weights.
 
     Parameters:
-        net (network)       -- network to be initialized
-        init_type (str)     -- initialization method: normal | xavier | kaiming | orthogonal
-        init_gain (float)   -- scaling factor for normal, xavier and orthogonal
+        net (network)       - network to be initialized
+        init_type (str)     - initialization method: normal | xavier | kaiming | orthogonal
+        init_gain (float)   - scaling factor for normal, xavier and orthogonal
     """
     def init(n):
         classname = n.__class__.__name__
