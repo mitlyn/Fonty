@@ -12,7 +12,7 @@ class Font:
 
     def __init__(
         self, mongo_collection, query: dict,
-        render_image_w: int = 128, render_image_h: int = 128,
+        render_image_w: int = 64, render_image_h: int = 64,
         render_glyph_proportion: int = 1
     ):
         self._font_object = mongo_collection.find_one(query)
@@ -27,12 +27,12 @@ class Font:
         self._glyph_proportion = render_glyph_proportion
 
         try:
-            self.baseline_y = self._font_object.baseline_y
+            self.baseline_y = self._font_object['baseline_y']
         except AttributeError:
             self.baseline_y = 0
 
         try:
-            self.cap_height = self._font_object.cap_height
+            self.cap_height = self._font_object['cap_height']
         except AttributeError:
             self.cap_height = 1000
             sys.stderr.write('This font does not contain cap_height property. Assuming cap_height=1000')
@@ -43,11 +43,15 @@ class Font:
 
     @property
     def family_name(self):
-        return self._font_object.family_name
+        return self._font_object['family_name']
 
     @property
     def font_name(self):
-        return self._font_object.font_name
+        return self._font_object['font_name']
+
+    @property
+    def panose(self):
+        return self._font_object['panose']
 
 
 class Glyph:

@@ -178,3 +178,6 @@ logs/
 
 # Certificates
 auth/
+
+# Quick Ignore
+-*
