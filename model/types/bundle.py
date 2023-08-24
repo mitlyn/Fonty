@@ -1,5 +1,4 @@
 from collections import namedtuple
 
-
-Bundle = namedtuple("Bundle", ["content", "style"])
-TrainBundle = namedtuple("TrainBundle", ["content", "style", "target"])
+Bundle = namedtuple("Bundle", ["content", "style", "panose"])
+TrainBundle = namedtuple("TrainBundle", ["content", "style", "target", "panose"])

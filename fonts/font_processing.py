@@ -17,8 +17,8 @@ from bs4 import BeautifulSoup
 import csv
 import itertools
 
-import errors
-import panose1
+from fonts.panose1 import digits_to_features
+from fonts.types.errors import FontyError
 
 
 Glyph = namedtuple('Glyph', ['d', 'glyph_name', 'unicode', 'attrs'])
@@ -44,7 +44,7 @@ def get_alphabet(name: str = None):
         return list(itertools.chain.from_iterable(ALPHABETS.values()))
 
 
-class EmptyPathError(errors.FontyError):
+class EmptyPathError(FontyError):
     pass
 
 
@@ -100,7 +100,7 @@ class FontProcessor:
 
         return {
             **features,
-            'panose': panose1.digits_to_features(self._font.os2_panose),
+            'panose': digits_to_features(self._font.os2_panose),
             'family_name': self._font.familyname,
             'font_name': self._font.fullname
         }

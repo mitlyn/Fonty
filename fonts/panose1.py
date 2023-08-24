@@ -5,8 +5,4 @@ PANOSE_FEATURES = (
 
 
 def digits_to_features(digits: tuple) -> dict:
-    return {
-        feature: value
-        for feature, value
-        in zip(PANOSE_FEATURES, digits)
-    }
+    return dict(zip(PANOSE_FEATURES, digits))

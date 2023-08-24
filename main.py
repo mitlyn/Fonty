@@ -1,8 +1,7 @@
 # %%---------------------------------------------------------------------------%
 
-import pandas as pd
+from pickle import load
 
-from torch import Tensor
 from lightning import Trainer
 from torch.utils.data import DataLoader
 
@@ -12,33 +11,52 @@ from model.utils import apply, show, showMany
 
 # %%---------------------------------------------------------------------------%
 
-raw_os_en = pd.read_csv("model/data/OS-EN.csv", header=None)
-raw_os_ua = pd.read_csv("model/data/OS-UA.csv", header=None)
-raw_if_en = pd.read_csv("model/data/IF-EN.csv", header=None)
+with open("-data/base.pkl", "rb") as X:
+    base = load(X)
 
-raw_os_en.drop(0, axis=1, inplace=True)
-raw_os_ua.drop(0, axis=1, inplace=True)
-raw_if_en.drop(0, axis=1, inplace=True)
+with open("-data/train.pkl", "rb") as X:
+    train = load(X)
 
-# %%---------------------------------------------------------------------------%
-
-if_en = Tensor(raw_if_en.values.reshape(-1, 64, 64))
-os_en = Tensor(raw_os_en.values.reshape(-1, 64, 64))
-os_ua = Tensor(raw_os_ua.values.reshape(-1, 64, 64))
-
-X = if_en
-S = os_ua
-Y = os_en
+with open("-data/test.pkl", "rb") as X:
+    test = load(X)
 
 # %%---------------------------------------------------------------------------%
 
-data = [TrainBundle(content=x, target=y, style=S[:5]) for x, y in zip(X, Y)]
-
-loader = DataLoader(data, batch_size=1)
+# Base font as a reference of how symbols should look like
+# It's same for all model training data bundles
+content = base.cyr
 
 # %%---------------------------------------------------------------------------%
 
-opt = Options()
+# Drop first element of train data
+# Fucking Jura Light broke all of my hopes
+train = train[1:]
+
+# %%---------------------------------------------------------------------------%
+
+
+
+# %%---------------------------------------------------------------------------%
+
+data = []
+
+for i in range(len(train)):
+    data.extend([
+        TrainBundle(
+            content=c,
+            target=t,
+            panose=t.panose,
+            style=train[i].lat,
+        ) for c, t in zip(content, train[i].cyr)
+    ])
+
+# %%---------------------------------------------------------------------------%
+
+loader = DataLoader(data, batch_size=1, shuffle=True)
+
+# %%---------------------------------------------------------------------------%
+
+opt = Options(refs=52)
 
 # %%---------------------------------------------------------------------------%
 
@@ -46,7 +64,7 @@ net = Model(opt)
 
 # %%---------------------------------------------------------------------------%
 
-trainer = Trainer(max_epochs=100)
+trainer = Trainer(max_epochs=5)
 
 # %%---------------------------------------------------------------------------%
 
@@ -54,7 +72,11 @@ trainer.fit(net, loader)
 
 # %%---------------------------------------------------------------------------%
 
-X = loader.dataset[0]
+trainer.save_checkpoint("model.ckpt")
+
+# %%---------------------------------------------------------------------------%
+
+X = loader.dataset[2999]
 showMany(X.content, X.target)
 
 # %%---------------------------------------------------------------------------%

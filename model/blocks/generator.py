@@ -48,6 +48,8 @@ class Generator(nn.Module):
 
         style_features = self.LA(style_features, style_features_1, style_features_2, style_features_3, B, K)
 
+        # Batch × 2 * (Filters * 4) × (Size / 4) × (Size / 4)
+        #   1   ×    (256 + 256)    ×     16     ×     16
         features = torch.cat([content_feature, style_features], dim=1)
 
         return self.D(features)
