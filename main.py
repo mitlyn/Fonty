@@ -1,12 +1,15 @@
 # %%---------------------------------------------------------------------------%
 
+from os import system
 from pickle import load
+from pprint import pprint as pp
 
 from lightning import Trainer
 from torch.utils.data import DataLoader
 
 from model.model import Model
 from model.types import TrainBundle, Options
+from fonts.panose1 import features_to_digits
 from model.utils import apply, show, showMany
 
 # %%---------------------------------------------------------------------------%
@@ -28,35 +31,51 @@ content = base.cyr
 
 # %%---------------------------------------------------------------------------%
 
-# Drop first element of train data
-# Fucking Jura Light broke all of my hopes
-train = train[1:]
+# 19..37
+# 50..51
+
+# i = 51
+
+# showMany(*content)
+
+# showMany(content[0], train[i].cyr[0])
+# print(train[i].name)
+# showMany(*train[i].cyr)
+
+# names = {x.name for x in train}
+
+# pp(names)
 
 # %%---------------------------------------------------------------------------%
 
-
+# Leave only well-generated fonts
+# train = [*train[19:37], *train[50:51]]
+train = [*train[50:51]]
 
 # %%---------------------------------------------------------------------------%
 
 data = []
 
-for i in range(len(train)):
+for item in train:
+    # TODO: store panose as number array in DB
+    panose = features_to_digits(item.panose)
+
     data.extend([
         TrainBundle(
-            content=c,
             target=t,
-            panose=t.panose,
-            style=train[i].lat,
-        ) for c, t in zip(content, train[i].cyr)
+            content=c,
+            style=item.lat,
+            panose=panose,
+        ) for c, t in zip(content, item.cyr)
     ])
 
 # %%---------------------------------------------------------------------------%
 
-loader = DataLoader(data, batch_size=1, shuffle=True)
+loader = DataLoader(data, shuffle=True)
 
 # %%---------------------------------------------------------------------------%
 
-opt = Options(refs=52)
+opt = Options()
 
 # %%---------------------------------------------------------------------------%
 
@@ -64,19 +83,20 @@ net = Model(opt)
 
 # %%---------------------------------------------------------------------------%
 
-trainer = Trainer(max_epochs=5)
+trainer = Trainer(max_epochs=100)
 
 # %%---------------------------------------------------------------------------%
+
+# TODO: advanced checkpointing
 
 trainer.fit(net, loader)
-
-# %%---------------------------------------------------------------------------%
-
 trainer.save_checkpoint("model.ckpt")
+# net.load_from_checkpoint("model.ckpt", opt=opt)
+# system("shutdown /s /t 1")
 
 # %%---------------------------------------------------------------------------%
 
-X = loader.dataset[2999]
+X = loader.dataset[25]
 showMany(X.content, X.target)
 
 # %%---------------------------------------------------------------------------%
