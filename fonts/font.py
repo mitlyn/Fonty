@@ -87,6 +87,14 @@ class Font:
             *args, **kwargs
         )
 
+    @classmethod
+    def loadByFontName(cls, font_name: str, mongo_collection, *args, **kwargs):
+        return cls.fromMongoQuery(
+            mongo_collection=mongo_collection,
+            query={'font_name': font_name},
+            *args, **kwargs
+        )
+
     def __getitem__(self, property_name):
         return self._properties[property_name]
 
