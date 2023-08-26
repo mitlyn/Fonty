@@ -36,23 +36,23 @@ class Font:
             for glyph in glyphs
         ]
         self._properties = properties
+        self._temp_dir = tempfile.TemporaryDirectory()
 
     @classmethod
     def fromProperties(
         cls, glyphs: list,
         family_name: str, font_name: str,
         panose: dict,
-        render_image_w: int = 64, render_image_h: int = 64,
-        render_glyph_proportion: int = 1,
+        image_w: int = 64, image_h: int = 64,
+        glyph_proportion: int = 1,
         baseline_y: int = 0, cap_height: int = 1000
     ):
         return cls(
             glyphs=glyphs,
             properties={
-                'image_w': render_image_w,
-                'image_h': render_image_h,
-                'temp_dir': tempfile.TemporaryDirectory(),
-                'glyph_proportion': render_glyph_proportion,
+                'image_w': image_w,
+                'image_h': image_h,
+                'glyph_proportion': glyph_proportion,
                 'baseline_y': baseline_y,
                 'cap_height': cap_height,
                 'family_name': family_name,
@@ -103,11 +103,19 @@ class Font:
                 'letter': glyph._letter,
                 'path': glyph._path
             }
-            for glyph in self.glyphs
+            for glyph in self._glyphs
             if glyph._letter in unique_letters
         ]
 
-        return Font(glyphs=glyphs, **self._properties)
+        return Font.fromProperties(glyphs=glyphs, **self._properties)
+
+    @property
+    def ua_subset(self):
+        return self.copy_from_unicode_subset(ALPHABETS['ua'])
+
+    @property
+    def en_subset(self):
+        return self.copy_from_unicode_subset(ALPHABETS['en'])
 
 
 class Glyph:
@@ -225,7 +233,7 @@ class Glyph:
 
     def to_png(self, fname: str):
         bounding_box = self._get_glyph_bbox(
-            self._path, os.path.join(self._font['temp_dir'].name, fname + '.svg')
+            self._path, os.path.join(self._font._temp_dir.name, fname + '.svg')
         )
         svg_text = self._get_svg_boilerplate(
             path=self._path, bounding_box=bounding_box,
@@ -237,6 +245,6 @@ class Glyph:
     @property
     def np_array(self):
         glyph_fname = (self._letter or '?').encode().hex() + '.png'
-        glyph_path = os.path.join(self._font['temp_dir'].name, glyph_fname)
+        glyph_path = os.path.join(self._font._temp_dir.name, glyph_fname)
         self.to_png(glyph_path)
         return plt.imread(glyph_path)
