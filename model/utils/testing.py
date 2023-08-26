@@ -8,12 +8,13 @@ def apply(net, data: Bundle) -> Tensor:
     """Apply font style transfer to given data."""
     content = data.content.view(1, -1, 64, 64).cuda()
     style = data.style.view(1, -1, 64, 64).cuda()
+    panose = data.panose.view(-1).cuda()
     net.cuda()
 
     net.eval()
 
     with no_grad():
-        result = net.G((content, style))
+        result = net.G((content, style, panose))
 
     net.train()
 

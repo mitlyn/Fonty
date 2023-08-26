@@ -51,7 +51,7 @@ class Model(LightningModule):
 
 
     def forward(self):
-        self.result = self.G((self.content, self.style))
+        self.result = self.G((self.content, self.style, self.panose))
 
 
     def D_loss(self, real_images, fake_images, discriminator):
@@ -102,6 +102,7 @@ class Model(LightningModule):
         self.content = batch.content.to(self.device).view(1, -1, 64, 64)
         self.target = batch.target.to(self.device).view(1, -1, 64, 64)
         self.style = batch.style.to(self.device).view(1, -1, 64, 64)
+        self.panose = batch.panose.to(self.device).view(-1)
 
         # Forward Pass
         self.forward()

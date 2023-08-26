@@ -12,6 +12,8 @@ class Generator(nn.Module):
 
         self.Es = Encoder(dim=1, filters=filters)
         self.Ec = Encoder(dim=1, filters=filters)
+        self.Ep = LinearEmbedder(filters=filters)
+
         self.D = Decoder(filters=filters, blocks=blocks, dropout=dropout)
 
         self.A1 = LocalAttention(filters=filters)
@@ -32,10 +34,12 @@ class Generator(nn.Module):
         )
 
     def forward(self, X):
-        content_image, style_images = X
+        content_image, style_images, panose = X
         B, K, _, _ = style_images.shape
 
         content_features = self.Ec(content_image)
+
+        panose_features = self.Ep(panose)
 
         style_features = self.Es(style_images.view(-1, 1, 64, 64))
         style_features_1 = self.A1(style_features)
@@ -48,8 +52,8 @@ class Generator(nn.Module):
 
         style_features = self.LA(style_features, style_features_1, style_features_2, style_features_3, B, K)
 
-        # Batch × 2 * (Filters * 4) × (Size / 4) × (Size / 4)
-        #   1   ×      2 * 256      ×     16     ×     16
-        features = torch.cat([content_features, style_features], dim=1)
+        # Batch × 3 * (Filters * 4) × (Size / 4) × (Size / 4)
+        #   1   ×      3 * 256      ×     16     ×     16
+        features = torch.cat([content_features, style_features, panose_features], dim=1)
 
         return self.D(features)

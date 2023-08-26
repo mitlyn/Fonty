@@ -13,7 +13,7 @@ class Decoder(nn.Module):
 
         # ResNet Blocks
         model.extend(ResNetBlock(
-            filters * 8,
+            filters * 12,
             padding='reflect',
             norm_layer=nn.BatchNorm2d,
             dropout=dropout,
@@ -21,7 +21,7 @@ class Decoder(nn.Module):
         ) for _ in range(blocks))
 
         # Upsampling Layers
-        for mul in [8, 4]:
+        for mul in [12, 6]:
             model += [
                 nn.ConvTranspose2d(
                     filters * mul,
@@ -37,7 +37,7 @@ class Decoder(nn.Module):
             ]
 
         model += [nn.ReflectionPad2d(3)]
-        model += [nn.Conv2d(filters * 2, 1, kernel_size=7, padding=0)]
+        model += [nn.Conv2d(filters * 3, 1, kernel_size=7, padding=0)]
         model += [nn.Tanh()]
 
         self.model = nn.Sequential(*model)
