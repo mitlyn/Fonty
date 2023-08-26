@@ -60,14 +60,14 @@ for item in train:
     # TODO: store panose as number array in DB
     panose = features_to_digits(item.panose)
 
-    data.extend([
+    data.extend(
         TrainBundle(
             target=t,
             content=c,
-            style=item.lat,
             panose=panose,
+            style=item.lat,
         ) for c, t in zip(content, item.cyr)
-    ])
+    )
 
 # %%---------------------------------------------------------------------------%
 
@@ -90,21 +90,19 @@ trainer = Trainer(max_epochs=100)
 # TODO: advanced checkpointing
 
 trainer.fit(net, loader)
-trainer.save_checkpoint("model.ckpt")
+
+# %%---------------------------------------------------------------------------%
+
+# TODO: loading from checkpoints doesn't work
+
+# net.to_onnx("model.onnx", X)
+# trainer.save_checkpoint("model.ckpt")
 # net.load_from_checkpoint("model.ckpt", opt=opt)
 # system("shutdown /s /t 1")
 
 # %%---------------------------------------------------------------------------%
 
 X = loader.dataset[25]
-showMany(X.content, X.target)
-
-# %%---------------------------------------------------------------------------%
-
-Y = apply(net, X)
-
-# %%---------------------------------------------------------------------------%
-
-show(Y)
+showMany(X.content, X.target, apply(net, X))
 
 # %%---------------------------------------------------------------------------%

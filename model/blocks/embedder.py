@@ -1,24 +1,29 @@
 import torch.nn as nn
-import torch.nn.functional as F
-
-# TODO: Work In Progress
+from torch import tensor, cat, int64, float32
+from torch.nn.functional import one_hot
 
 # *----------------------------------------------------------------------------*
 
-# nn.Embedding
 
-class Embedder(nn.Module):
-    def __init__(self, dim, filters=64):
-        super(Embedder, self).__init__()
+class LinearEmbedder(nn.Module):
+    def __init__(self, filters=64):
+        super(LinearEmbedder, self).__init__()
 
-        model = [
-            nn.ReflectionPad2d(3),
-            nn.Conv2d(dim, filters, kernel_size=7, padding=0, bias=False),
-            nn.BatchNorm2d(filters),
-            nn.ReLU(True),
-        ]
+        self.filters = filters
 
-        self.model = nn.Sequential(*model)
+        self.model = nn.Sequential(
+            nn.Linear(114, filters**3 // 4),
+            nn.LeakyReLU(inplace=True),
+            nn.Unflatten(0, (1, filters * 4, filters // 4, filters // 4)),
+        )
 
-    def forward(self, inp):
-        return self.model(inp)
+        self.num_classes = tensor((6, 16, 12, 10, 10, 11, 12, 16, 14, 7), dtype=int64)
+
+
+    def forward(self, panose):
+        encoded = cat([
+            one_hot(panose[i], num_classes=self.num_classes[i])
+            for i in range(10)
+        ]).to(float32)
+
+        return self.model(encoded)
