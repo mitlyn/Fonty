@@ -2,6 +2,8 @@ from model.blocks.resnet import ResNetBlock
 from model.blocks.encoder import Encoder
 from model.blocks.decoder import Decoder
 
+from model.blocks.embedder import LinearEmbedder
+
 from model.blocks.self_attention import SelfAttention
 from model.blocks.local_attention import LocalAttention
 from model.blocks.layer_attention import LayerAttention

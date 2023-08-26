@@ -11,29 +11,28 @@ class Decoder(nn.Module):
 
         model = []
 
-        for i in range(blocks):       # add ResNet blocks
-            model += [ResNetBlock(
-                filters * 8,
-                padding='reflect',
-                norm_layer=nn.BatchNorm2d,
-                dropout=dropout,
-                bias=False
-            )]
+        # ResNet Blocks
+        model.extend(ResNetBlock(
+            filters * 8,
+            padding='reflect',
+            norm_layer=nn.BatchNorm2d,
+            dropout=dropout,
+            bias=False
+        ) for _ in range(blocks))
 
-        for i in range(2):  # add upsampling layers
-            mul = 2 ** (3 - i)
-
+        # Upsampling Layers
+        for mul in [8, 4]:
             model += [
                 nn.ConvTranspose2d(
                     filters * mul,
-                    int(filters * mul / 2),
+                    filters * mul // 2,
                     kernel_size=3,
                     stride=2,
                     padding=1,
                     output_padding=1,
                     bias=False
                 ),
-                nn.BatchNorm2d(int(filters * mul / 2)),
+                nn.BatchNorm2d(filters * mul // 2),
                 nn.ReLU(True)
             ]
 

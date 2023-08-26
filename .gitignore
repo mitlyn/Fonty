@@ -172,9 +172,11 @@ cython_debug/
 # IDE - VSCode
 .vscode/
 
-# Training Logs
+# Training Related Files
 lightning_logs/
-logs/
+torch_logs/
+*.ckpt
+*.onnx
 
 # Certificates
 auth/

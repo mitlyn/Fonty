@@ -1,5 +1,5 @@
+from lightning import LightningModule
 import torch, torch.nn as nn, torch.optim as op
-import lightning as L
 
 from model.blocks import Generator, Discriminator, GANLoss
 from model.types import TrainBundle, Options
@@ -11,7 +11,7 @@ from model.utils import setInit
 # *----------------------------------------------------------------------------*
 
 
-class Model(L.LightningModule):
+class Model(LightningModule):
     def __init__(self, opt: Options):
         super(Model, self).__init__()
 
@@ -38,12 +38,6 @@ class Model(L.LightningModule):
         self.G_optimizer = op.Adam(self.G.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
         self.Ds_optimizer = op.Adam(self.Ds.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
         self.Dc_optimizer = op.Adam(self.Dc.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-
-
-    def set_input(self, data: TrainBundle):
-        self.style = data.style.to(self.device).view(1, -1, 64, 64)
-        self.target = data.target.to(self.device).view(1, -1, 64, 64)
-        self.content = data.content.to(self.device).view(1, -1, 64, 64)
 
 
     def toggle_grads(self, state: bool, *nets):
@@ -103,11 +97,16 @@ class Model(L.LightningModule):
         self.loss_G.backward()
 
 
-    def training_step(self, batch, batch_idx):
-        self.set_input(batch)
+    def training_step(self, batch: TrainBundle, batch_idx: int):
+        # Process Batch
+        self.content = batch.content.to(self.device).view(1, -1, 64, 64)
+        self.target = batch.target.to(self.device).view(1, -1, 64, 64)
+        self.style = batch.style.to(self.device).view(1, -1, 64, 64)
+
+        # Forward Pass
         self.forward()
 
-        # Update D
+        # Update Discriminators
         self.toggle_grads(True, self.Dc, self.Ds)
         self.Dc_optimizer.zero_grad()
         self.Ds_optimizer.zero_grad()
@@ -115,7 +114,7 @@ class Model(L.LightningModule):
         self.Dc_optimizer.step()
         self.Ds_optimizer.step()
 
-        # Update G
+        # Update Generator
         self.toggle_grads(False, self.Dc, self.Ds)
         self.G_optimizer.zero_grad()
         self.G_back()

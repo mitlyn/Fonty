@@ -16,7 +16,7 @@ class Options:
 
     # *--------------------------------------------------------------------* Model Options
     # number of reference style images
-    refs: int = 5
+    refs: int = 52
     # number of G filters in the last conv layer
     G_filters: int = 64
     # number of D filters in the first conv layer
