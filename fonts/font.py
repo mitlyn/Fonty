@@ -7,51 +7,123 @@ import matplotlib.pyplot as plt
 import cairosvg
 import svgpathtools
 
+import itertools
+
+
+ALPHABETS = {
+    'ua': [*'АаБбВвГгҐґДдЕеЄєЖжЗзИиІіЇїЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЬьЮюЯя'],
+    'en': [*'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz'],
+    'puncts': [*',.;:\'"()/[]{}\\/!@#$%^&*?-+=*<>'],
+    'digits': '0123456789'
+}
+
+
+def get_alphabet(name: str = None):
+    """Returns alphabets from ALPHABETS. Returns all alphabets if not arguments
+    prodived.
+    """
+    if name != 'all':
+        return ALPHABETS[name]
+    else:
+        return list(itertools.chain.from_iterable(ALPHABETS.values()))
+
 
 class Font:
 
-    def __init__(
-        self, mongo_collection, query: dict,
-        render_image_w: int = 64, render_image_h: int = 64,
-        render_glyph_proportion: int = 1
-    ):
-        self._font_object = mongo_collection.find_one(query)
+    def __init__(self, glyphs: list, properties: dict):
         self._glyphs = [
             Glyph(glyph['letter'], glyph['path'], self)
-            for glyph
-            in self._font_object['glyphs']
+            for glyph in glyphs
         ]
-        self._image_w = render_image_w
-        self._image_h = render_image_h
+        self._properties = properties
         self._temp_dir = tempfile.TemporaryDirectory()
-        self._glyph_proportion = render_glyph_proportion
+
+    @classmethod
+    def fromProperties(
+        cls, glyphs: list,
+        family_name: str, font_name: str,
+        panose: dict,
+        image_w: int = 64, image_h: int = 64,
+        glyph_proportion: int = 1,
+        baseline_y: int = 0, cap_height: int = 1000
+    ):
+        return cls(
+            glyphs=glyphs,
+            properties={
+                'image_w': image_w,
+                'image_h': image_h,
+                'glyph_proportion': glyph_proportion,
+                'baseline_y': baseline_y,
+                'cap_height': cap_height,
+                'family_name': family_name,
+                'font_name': font_name,
+                'panose': panose
+            }
+        )
+
+    @classmethod
+    def fromMongoQuery(cls, mongo_collection, query: dict, *args, **kwargs):
+        font = mongo_collection.find_one(query)
 
         try:
-            self.baseline_y = self._font_object['baseline_y']
-        except AttributeError:
-            self.baseline_y = 0
+            cap_height = font['cap_height']
+        except KeyError:
+            cap_height = 1000
+            print('This font does not contain cap_height property. Assuming cap_height=1000', file=sys.stderr)
 
         try:
-            self.cap_height = self._font_object['cap_height']
-        except AttributeError:
-            self.cap_height = 1000
-            sys.stderr.write('This font does not contain cap_height property. Assuming cap_height=1000')
+            baseline_y = font['baseline_y']
+        except KeyError:
+            baseline_y = 0
+            print('This font does not contain baseline_y property. Assuming baseline_y=0', file=sys.stderr)
+
+        return cls.fromProperties(
+            glyphs=font['glyphs'],
+            family_name=font['family_name'],
+            font_name=font['font_name'],
+            panose=font['panose'],
+            cap_height=cap_height,
+            baseline_y=baseline_y,
+            *args, **kwargs
+        )
+
+    @classmethod
+    def loadByFontName(cls, font_name: str, mongo_collection, *args, **kwargs):
+        return cls.fromMongoQuery(
+            mongo_collection=mongo_collection,
+            query={'font_name': font_name},
+            *args, **kwargs
+        )
+
+    def __getitem__(self, property_name):
+        return self._properties[property_name]
+
+    def __setitem__(self, property_name, value):
+        self._properties[property_name] = value
+
+    def copy_from_unicode_subset(self, unicode_subset: list):
+        """Generates new glyphset on the given unicode letters.
+        """
+        unique_letters = list(set(unicode_subset))
+
+        glyphs = [
+            {
+                'letter': glyph._letter,
+                'path': glyph._path
+            }
+            for glyph in self._glyphs
+            if glyph._letter in unique_letters
+        ]
+
+        return Font.fromProperties(glyphs=glyphs, **self._properties)
 
     @property
-    def glyphs(self):
-        return self._glyphs
+    def ua_subset(self):
+        return self.copy_from_unicode_subset(ALPHABETS['ua'])
 
     @property
-    def family_name(self):
-        return self._font_object['family_name']
-
-    @property
-    def font_name(self):
-        return self._font_object['font_name']
-
-    @property
-    def panose(self):
-        return self._font_object['panose']
+    def en_subset(self):
+        return self.copy_from_unicode_subset(ALPHABETS['en'])
 
 
 class Glyph:
@@ -69,7 +141,7 @@ class Glyph:
         image_h: int, image_w: int,
         glyph_size_proportion: int
     ):
-        vector_ymin, vector_ymax = self._font.baseline_y, self._font.cap_height
+        vector_ymin, vector_ymax = self._font['baseline_y'], self._font['cap_height']
 
         glyph_height = (glyph_size_proportion * image_h) / (glyph_size_proportion + 2)
         padding_y = (image_h - glyph_height) / 2
@@ -173,10 +245,10 @@ class Glyph:
         )
         svg_text = self._get_svg_boilerplate(
             path=self._path, bounding_box=bounding_box,
-            image_w=self._font._image_w, image_h=self._font._image_h,
-            glyph_size_proportion=self._font._glyph_proportion
+            image_w=self._font['image_w'], image_h=self._font['image_h'],
+            glyph_size_proportion=self._font['glyph_proportion']
         )
-        self._svg2png(self._path, svg_text, self._font._image_w, self._font._image_h, fname)
+        self._svg2png(self._path, svg_text, self._font['image_w'], self._font['image_h'], fname)
 
     @property
     def np_array(self):

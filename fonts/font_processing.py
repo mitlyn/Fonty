@@ -29,7 +29,7 @@ ALPHABETS = {
     'ua': [*'АаБбВвГгҐґДдЕеЄєЖжЗзИиІіЇїЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЬьЮюЯя'],
     'en': [*'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz'],
     'puncts': [*',.;:\'"()/[]{}\\/!@#$%^&*?-+=*<>'],
-    'digits': '0123456789'
+    'digits': [*'0123456789']
 }
 
 
@@ -91,18 +91,19 @@ class FontProcessor:
 
     @property
     def features(self):
-        features = {
-            feature[4:]: getattr(self._font, feature)
-            for feature
-            in dir(self._font)
-            if feature[:4] == 'os2_' and feature != 'os2_panose'
+        feature_names_mapping = {
+            'os2_panose': 'panose',
+            'os2_unicoderanges': 'unicoderanges',
+            'os2_weight': 'weight',
+            'capHeight': 'cap_height',
+            'familyname': 'family_name',
+            'fullname': 'font_name'
         }
 
         return {
-            **features,
-            'panose': digits_to_features(self._font.os2_panose),
-            'family_name': self._font.familyname,
-            'font_name': self._font.fullname
+            mapped_name: getattr(self._font, fontforge_name)
+            for fontforge_name, mapped_name
+            in feature_names_mapping.items()
         }
 
     def __del__(self):
@@ -341,10 +342,10 @@ class Glyphset:
             **self.font_processor.features,
             'glyphs': [
                 {
-                    'letter': letter,
+                    'letter': glyph.unicode,
                     'path': glyph.d
                 }
-                for glyph, letter
-                in zip(self.glyphs, self.letters)
+                for glyph
+                in self.glyphs
             ]
         }
