@@ -4,6 +4,7 @@ from torch.nn.functional import one_hot
 
 # *----------------------------------------------------------------------------*
 
+# TODO: panose batches
 
 class LinearEmbedder(nn.Module):
     def __init__(self, filters=64):
@@ -12,7 +13,7 @@ class LinearEmbedder(nn.Module):
         self.filters = filters
 
         self.model = nn.Sequential(
-            nn.Linear(114, filters**3 // 4),
+            nn.Linear(115, filters**3 // 4),
             nn.LeakyReLU(inplace=True),
             nn.Unflatten(0, (1, filters * 4, filters // 4, filters // 4)),
         )
@@ -39,7 +40,7 @@ class AttentionEmbedder(nn.Module):
         self.filters = filters
 
         self.model = nn.Sequential(
-            nn.Linear(114, filters**3 // 4),
+            nn.Linear(115, filters**3 // 4),
             nn.LeakyReLU(inplace=True),
             nn.Unflatten(0, (1, filters * 4, filters // 4, filters // 4)),
         )
