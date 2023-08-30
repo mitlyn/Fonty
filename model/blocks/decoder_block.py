@@ -12,21 +12,21 @@ import torch.nn as nn
         bias (bool)     - uses bias?
 """
 
-class ResNetBlock(nn.Module):
+class DecoderBlock(nn.Module):
     def __init__(self, dim: int, padding: str, norm_layer, dropout: bool, bias: bool):
-        super(ResNetBlock, self).__init__()
+        super(DecoderBlock, self).__init__()
 
-        conv_block = []
+        model = []
 
         p = 0
         if padding == 'reflect':
-            conv_block += [nn.ReflectionPad2d(1)]
+            model += [nn.ReflectionPad2d(1)]
         elif padding == 'replicate':
-            conv_block += [nn.ReplicationPad2d(1)]
+            model += [nn.ReplicationPad2d(1)]
         else:
             p = 1
 
-        conv_block += [
+        model += [
             nn.Conv2d(
                 dim, dim,
                 kernel_size=3,
@@ -38,17 +38,17 @@ class ResNetBlock(nn.Module):
         ]
 
         if dropout:
-            conv_block += [nn.Dropout(0.5)]
+            model += [nn.Dropout(0.5)]
 
         p = 0
         if padding == 'reflect':
-            conv_block += [nn.ReflectionPad2d(1)]
+            model += [nn.ReflectionPad2d(1)]
         elif padding == 'replicate':
-            conv_block += [nn.ReplicationPad2d(1)]
+            model += [nn.ReplicationPad2d(1)]
         else:
             p = 1
 
-        conv_block += [
+        model += [
             nn.Conv2d(
                 dim, dim,
                 kernel_size=3,
@@ -58,7 +58,7 @@ class ResNetBlock(nn.Module):
             norm_layer(dim)
         ]
 
-        self.conv_block = nn.Sequential(*conv_block)
+        self.model = nn.Sequential(*model)
 
     def forward(self, X):
-        return X + self.conv_block(X)
+        return self.model(X)

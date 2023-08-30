@@ -2,7 +2,6 @@
 
 from os import system
 from pickle import load
-from pprint import pprint as pp
 
 from lightning import Trainer
 from torch.utils.data import DataLoader
@@ -31,25 +30,6 @@ content = base.cyr
 
 # %%---------------------------------------------------------------------------%
 
-# 19..37
-# 50..51
-
-# i = 51
-
-# showMany(*content)
-
-# showMany(content[0], train[i].cyr[0])
-# print(train[i].name)
-# showMany(*train[i].cyr)
-
-# names = {x.name for x in train}
-
-# pp(names)
-
-# %%---------------------------------------------------------------------------%
-
-# Leave only well-generated fonts
-# train = [*train[19:37], *train[50:51]]
 train = [*train[50:51]]
 
 # %%---------------------------------------------------------------------------%

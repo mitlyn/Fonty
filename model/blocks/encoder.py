@@ -16,8 +16,8 @@ class Encoder(nn.Module):
             nn.ReLU(True)
         ]
 
-        for i in range(2):  # add downsampling layers
-            mul = 2 ** i
+        # Downsampling Layers
+        for mul in [1, 2]:
             model += [
                 nn.Conv2d(filters * mul, filters * mul * 2, kernel_size=3, stride=2, padding=1, bias=False),
                 nn.BatchNorm2d(filters * mul * 2),

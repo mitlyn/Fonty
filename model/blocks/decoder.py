@@ -9,19 +9,19 @@ class Decoder(nn.Module):
     def __init__(self, filters: int = 64, blocks: int = 6, dropout: bool = False):
         super(Decoder, self).__init__()
 
-        model = []
-
-        # ResNet Blocks
-        model.extend(ResNetBlock(
-            filters * 12,
-            padding='reflect',
-            norm_layer=nn.BatchNorm2d,
-            dropout=dropout,
-            bias=False
-        ) for _ in range(blocks))
+        # Residual Convolution Blocks
+        model = [
+            Residual(DecoderBlock(
+                filters * 8, # { 12 | 8 }
+                padding='reflect',
+                norm_layer=nn.BatchNorm2d,
+                dropout=dropout,
+                bias=False
+            )) for _ in range(blocks)
+        ]
 
         # Upsampling Layers
-        for mul in [12, 6]:
+        for mul in [8, 4]: # { [12, 6] | [8, 4] }
             model += [
                 nn.ConvTranspose2d(
                     filters * mul,
@@ -36,9 +36,11 @@ class Decoder(nn.Module):
                 nn.ReLU(True)
             ]
 
-        model += [nn.ReflectionPad2d(3)]
-        model += [nn.Conv2d(filters * 3, 1, kernel_size=7, padding=0)]
-        model += [nn.Tanh()]
+        model += [
+            nn.ReflectionPad2d(3),
+            nn.Conv2d(filters * 2, 1, kernel_size=7, padding=0), # { 3 | 2 }
+            nn.Tanh(),
+        ]
 
         self.model = nn.Sequential(*model)
 
