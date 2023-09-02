@@ -15,33 +15,11 @@ import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
 
 import csv
-import itertools
 
-from fonts.panose1 import digits_to_features
 from fonts.types.errors import FontyError
-
 
 Glyph = namedtuple('Glyph', ['d', 'glyph_name', 'unicode', 'attrs'])
 GLYPH_FETCH_ATTRS = ['d', 'glyph-name', 'unicode']
-
-
-ALPHABETS = {
-    'ua': [*'АаБбВвГгҐґДдЕеЄєЖжЗзИиІіЇїЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЬьЮюЯя'],
-    'en': [*'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz'],
-    'puncts': [*',.;:\'"()/[]{}\\/!@#$%^&*?-+=*<>'],
-    'digits': [*'0123456789']
-}
-
-
-def get_alphabet(name: str = None):
-    """Returns alphabet from ALPHABETS. Returns all alphabets if no arguments
-    provided.
-    """
-    if name != 'all':
-        return ALPHABETS[name]
-
-    else:
-        return list(itertools.chain.from_iterable(ALPHABETS.values()))
 
 
 class EmptyPathError(FontyError):

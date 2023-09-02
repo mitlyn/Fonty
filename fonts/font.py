@@ -2,31 +2,14 @@ import os
 import sys
 import tempfile
 
+from numpy import ndarray
+from typing import Generator
 import matplotlib.pyplot as plt
 
 import cairosvg
 import svgpathtools
 
-import itertools
-
-
-ALPHABETS = {
-    'ua': [*'АаБбВвГгҐґДдЕеЄєЖжЗзИиІіЇїЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЬьЮюЯя'],
-    'en': [*'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz'],
-    'puncts': [*',.;:\'"()/[]{}\\/!@#$%^&*?-+=*<>'],
-    'digits': '0123456789'
-}
-
-
-def get_alphabet(name: str = None):
-    """Returns alphabets from ALPHABETS. Returns all alphabets if not arguments
-    prodived.
-    """
-    if name != 'all':
-        return ALPHABETS[name]
-    else:
-        return list(itertools.chain.from_iterable(ALPHABETS.values()))
-
+from fonts.symbols import SYMBOLS, get_symbols
 
 class Font:
 
@@ -62,30 +45,34 @@ class Font:
         )
 
     @classmethod
-    def fromMongoQuery(cls, mongo_collection, query: dict, *args, **kwargs):
-        font = mongo_collection.find_one(query)
-
+    def fromDocument(cls, document, *args, **kwargs):
         try:
-            cap_height = font['cap_height']
+            cap_height = document['cap_height']
         except KeyError:
             cap_height = 1000
             print('This font does not contain cap_height property. Assuming cap_height=1000', file=sys.stderr)
 
         try:
-            baseline_y = font['baseline_y']
+            baseline_y = document['baseline_y']
         except KeyError:
             baseline_y = 0
             print('This font does not contain baseline_y property. Assuming baseline_y=0', file=sys.stderr)
 
         return cls.fromProperties(
-            glyphs=font['glyphs'],
-            family_name=font['family_name'],
-            font_name=font['font_name'],
-            panose=font['panose'],
+            glyphs=document['glyphs'],
+            family_name=document['family_name'],
+            font_name=document['font_name'],
+            panose=document['panose'],
             cap_height=cap_height,
             baseline_y=baseline_y,
             *args, **kwargs
         )
+
+    @classmethod
+    def fromMongoQuery(cls, mongo_collection, query: dict, *args, **kwargs):
+        document = mongo_collection.find_one(query)
+
+        return cls.fromDocument(document, *args, **kwargs)
 
     @classmethod
     def loadByFontName(cls, font_name: str, mongo_collection, *args, **kwargs):
@@ -119,11 +106,19 @@ class Font:
 
     @property
     def ua_subset(self):
-        return self.copy_from_unicode_subset(ALPHABETS['ua'])
+        return self.copy_from_unicode_subset(SYMBOLS['ua'])
 
     @property
     def en_subset(self):
-        return self.copy_from_unicode_subset(ALPHABETS['en'])
+        return self.copy_from_unicode_subset(SYMBOLS['en'])
+
+    def render(self, subset: str) -> Generator[ndarray]:
+        symbols = get_symbols(subset)
+        self._glyphs.sort(key=lambda glyph: symbols.index(glyph._letter))
+
+        for glyph in self._glyphs:
+            if glyph._letter in subset:
+                yield glyph.np_array
 
 
 class Glyph:
@@ -251,7 +246,7 @@ class Glyph:
         self._svg2png(self._path, svg_text, self._font['image_w'], self._font['image_h'], fname)
 
     @property
-    def np_array(self):
+    def np_array(self) -> ndarray:
         glyph_fname = (self._letter or '?').encode().hex() + '.png'
         glyph_path = os.path.join(self._font._temp_dir.name, glyph_fname)
         self.to_png(glyph_path)
