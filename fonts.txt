@@ -1,3 +1,13 @@
+https://github.com/edx/edx-fonts/raw/master/open-sans/fonts/Bold/OpenSans-Bold.ttf
+https://github.com/edx/edx-fonts/raw/master/open-sans/fonts/BoldItalic/OpenSans-BoldItalic.ttf
+https://github.com/edx/edx-fonts/raw/master/open-sans/fonts/ExtraBold/OpenSans-ExtraBold.ttf
+https://github.com/edx/edx-fonts/raw/master/open-sans/fonts/ExtraBoldItalic/OpenSans-ExtraBoldItalic.ttf
+https://github.com/edx/edx-fonts/raw/master/open-sans/fonts/Italic/OpenSans-Italic.ttf
+https://github.com/edx/edx-fonts/raw/master/open-sans/fonts/Light/OpenSans-Light.ttf
+https://github.com/edx/edx-fonts/raw/master/open-sans/fonts/LightItalic/OpenSans-LightItalic.ttf
+https://github.com/edx/edx-fonts/raw/master/open-sans/fonts/Regular/OpenSans-Regular.ttf
+https://github.com/edx/edx-fonts/raw/master/open-sans/fonts/Semibold/OpenSans-Semibold.ttf
+https://github.com/edx/edx-fonts/raw/master/open-sans/fonts/SemiboldItalic/OpenSans-SemiboldItalic.ttf
 https://github.com/google/fonts/raw/main/ofl/electrolize/Electrolize-Regular.ttf
 https://github.com/google/fonts/raw/main/ofl/alice/Alice-Regular.ttf
 https://github.com/google/fonts/raw/main/ufl/ubuntu/Ubuntu-Bold.ttf
