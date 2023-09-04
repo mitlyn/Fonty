@@ -26,7 +26,7 @@ with open("-data/test.pkl", "rb") as X:
 
 # Base font as a reference of how symbols should look like
 # It's same for all model training data bundles
-content = base.cyr
+content = base.ua
 
 # %%---------------------------------------------------------------------------%
 
@@ -45,8 +45,8 @@ for item in train:
             target=t,
             content=c,
             panose=panose,
-            style=item.lat,
-        ) for c, t in zip(content, item.cyr)
+            style=item.en,
+        ) for c, t in zip(content, item.ua)
     )
 
 # %%---------------------------------------------------------------------------%

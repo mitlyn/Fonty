@@ -144,7 +144,7 @@ class FontProcessor:
         path: str,
         glyph_size_proportion: int = 1,
         bounding_box: tuple = None,
-        image_w: str = 128, image_h: str = 128,
+        image_w: str = 64, image_h: str = 64,
         background: str = None, fill: str = None
     ):
         """Generates SVG code for a given glyph.
@@ -222,7 +222,7 @@ class FontProcessor:
 
     def glyph2png(
         self,
-        glyph: Glyph, fname: str, image_w: int = 128, image_h: int = 128, glyph_size_proportion: int = 1
+        glyph: Glyph, fname: str, image_w: int = 64, image_h: int = 64, glyph_size_proportion: int = 1
     ):
         """Renders a glyph to PNG image with the given size.
         """

@@ -3,7 +3,7 @@ import sys
 import tempfile
 
 from numpy import ndarray
-from typing import Generator
+from typing import Iterable
 import matplotlib.pyplot as plt
 
 import cairosvg
@@ -112,13 +112,12 @@ class Font:
     def en_subset(self):
         return self.copy_from_unicode_subset(SYMBOLS['en'])
 
-    def render(self, subset: str) -> Generator[ndarray]:
+    def render(self, subset: str) -> Iterable[ndarray]:
         symbols = get_symbols(subset)
-        self._glyphs.sort(key=lambda glyph: symbols.index(glyph._letter))
+        glyphs = list(filter(lambda glyph: glyph._letter in symbols, self._glyphs))
+        glyphs.sort(key=lambda glyph: symbols.index(glyph._letter))
 
-        for glyph in self._glyphs:
-            if glyph._letter in subset:
-                yield glyph.np_array
+        return (glyph.np_array for glyph in glyphs)
 
 
 class Glyph:
@@ -161,7 +160,7 @@ class Glyph:
         path: str,
         glyph_size_proportion: int = 1,
         bounding_box: tuple = None,
-        image_w: str = 128, image_h: str = 128,
+        image_w: str = 64, image_h: str = 64,
         background: str = None, fill: str = None
     ):
         """Generates SVG code for a given glyph.

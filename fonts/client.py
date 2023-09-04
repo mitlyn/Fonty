@@ -9,8 +9,7 @@ MONGO_CONFIG = {
 }
 
 MONGO_DATABASE = "fonty"
-MONGO_GLYPHS = "glyphs"
-MONGO_FONTS = "fonts"
+MONGO_COLLECTION = "fonts"
 
 # *----------------------------------------------------------------------------* Client Class
 
@@ -20,5 +19,4 @@ class Client:
 
     def __init__(self):
         self.client = MongoClient(**MONGO_CONFIG)
-        self.glyphs = self.client[MONGO_DATABASE][MONGO_GLYPHS]
-        self.fonts = self.client[MONGO_DATABASE][MONGO_FONTS]
+        self.fonts = self.client[MONGO_DATABASE][MONGO_COLLECTION]
