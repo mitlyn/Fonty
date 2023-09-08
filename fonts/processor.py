@@ -15,33 +15,11 @@ import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
 
 import csv
-import itertools
 
-from fonts.panose1 import digits_to_features
 from fonts.types.errors import FontyError
-
 
 Glyph = namedtuple('Glyph', ['d', 'glyph_name', 'unicode', 'attrs'])
 GLYPH_FETCH_ATTRS = ['d', 'glyph-name', 'unicode']
-
-
-ALPHABETS = {
-    'ua': [*'АаБбВвГгҐґДдЕеЄєЖжЗзИиІіЇїЙйКкЛлМмНнОоПпРрСсТтУуФфХхЦцЧчШшЩщЬьЮюЯя'],
-    'en': [*'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz'],
-    'puncts': [*',.;:\'"()/[]{}\\/!@#$%^&*?-+=*<>'],
-    'digits': [*'0123456789']
-}
-
-
-def get_alphabet(name: str = None):
-    """Returns alphabet from ALPHABETS. Returns all alphabets if no arguments
-    provided.
-    """
-    if name != 'all':
-        return ALPHABETS[name]
-
-    else:
-        return list(itertools.chain.from_iterable(ALPHABETS.values()))
 
 
 class EmptyPathError(FontyError):
@@ -166,7 +144,7 @@ class FontProcessor:
         path: str,
         glyph_size_proportion: int = 1,
         bounding_box: tuple = None,
-        image_w: str = 128, image_h: str = 128,
+        image_w: str = 64, image_h: str = 64,
         background: str = None, fill: str = None
     ):
         """Generates SVG code for a given glyph.
@@ -244,7 +222,7 @@ class FontProcessor:
 
     def glyph2png(
         self,
-        glyph: Glyph, fname: str, image_w: int = 128, image_h: int = 128, glyph_size_proportion: int = 1
+        glyph: Glyph, fname: str, image_w: int = 64, image_h: int = 64, glyph_size_proportion: int = 1
     ):
         """Renders a glyph to PNG image with the given size.
         """

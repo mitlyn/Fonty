@@ -1,3 +1,3 @@
 from collections import namedtuple
 
-Glyphs = namedtuple('Glyphs', ['name', 'size', 'panose', 'lat', 'cyr'])
+MongoGlyphs = namedtuple('MongoGlyphs', ['name', 'size', 'panose', 'en', 'ua'])

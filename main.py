@@ -1,52 +1,44 @@
 # %%---------------------------------------------------------------------------%
 
 from os import system
-from pickle import load
-
 from lightning import Trainer
 from torch.utils.data import DataLoader
 
 from model.model import Model
+from fonts.loader import load
 from model.types import TrainBundle, Options
-from fonts.panose1 import features_to_digits
-from model.utils import apply, show, showMany
+from model.utils import apply, iShow, iShowMany, iSave, iSaveMany
 
 # %%---------------------------------------------------------------------------%
 
-with open("-data/base.pkl", "rb") as X:
-    base = load(X)
-
-with open("-data/train.pkl", "rb") as X:
-    train = load(X)
-
-with open("-data/test.pkl", "rb") as X:
-    test = load(X)
+# TODO: data downloading
 
 # %%---------------------------------------------------------------------------%
 
-# Base font as a reference of how symbols should look like
-# It's same for all model training data bundles
-content = base.cyr
+# Base font is a reference of how symbols should look like.
+# It's same for all model training and inference data bundles.
+content = load("base").ua
 
 # %%---------------------------------------------------------------------------%
 
-train = [*train[50:51]]
+train = load("train")
+
+# %%---------------------------------------------------------------------------%
+
+# train = [*train[:8]]
 
 # %%---------------------------------------------------------------------------%
 
 data = []
 
 for item in train:
-    # TODO: store panose as number array in DB
-    panose = features_to_digits(item.panose)
-
     data.extend(
         TrainBundle(
             target=t,
             content=c,
-            panose=panose,
-            style=item.lat,
-        ) for c, t in zip(content, item.cyr)
+            style=item.en,
+            panose=item.panose,
+        ) for c, t in zip(content, item.ua)
     )
 
 # %%---------------------------------------------------------------------------%
@@ -83,6 +75,11 @@ trainer.fit(net, loader)
 # %%---------------------------------------------------------------------------%
 
 X = loader.dataset[25]
-showMany(X.content, X.target, apply(net, X))
+iShowMany(X.content, X.target, apply(net, X))
+
+# %%---------------------------------------------------------------------------%
+
+x = apply(net, X)
+iSave(x)
 
 # %%---------------------------------------------------------------------------%

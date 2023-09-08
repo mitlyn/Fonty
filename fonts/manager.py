@@ -1,64 +1,124 @@
-from pymongo import MongoClient
+from bson import Binary
+from pickle import dumps
+from typing import Iterable, List, Set
+from torch import Tensor, tensor, empty
 
-from torch import tensor
-from pickle import loads
+from pymongo.results import InsertManyResult, InsertOneResult, DeleteResult
 
-from typing import Any, List, Dict
-from fonts.types.mongo import Glyphs
-
-# TODO: visualization ?
-
-# *----------------------------------------------------------------------------*
-
-MONGO_HOST = "mongodb+srv://fonty.hquocfa.mongodb.net/?authSource=%24external&authMechanism=MONGODB-X509&retryWrites=true&w=majority"
-MONGO_KEY_PATH = "auth/X509-cert-6658948524510096383.pem"
-MONGO_TLS = True
-
-MONGO_DATABASE = "fonty"
-MONGO_GLYPHS = "glyphs"
-# MONGO_FONTS = "fonts"
-
-# *----------------------------------------------------------------------------*
+from fonts.font import Font
+from fonts.symbols import get_symbols
+from fonts.processor import FontProcessor
+from fonts.clients import RemoteClient, LocalClient
 
 
-class Manager:
-    def __init__(self):
-        self.client = MongoClient(
-            MONGO_HOST, tls=MONGO_TLS, tlsCertificateKeyFile=MONGO_KEY_PATH
+class FontManager():
+    def __init__(self, remoteDB: RemoteClient, localDB: LocalClient):
+        self.fonts = remoteDB.col
+        self.cache = localDB.col
+
+    # *------------------------------------------------------------------------* Font Management (MongoDB)
+
+    def dropFonts(self) -> DeleteResult:
+        return self.fonts.delete_many({})
+
+
+    def addFonts(self, *urls: Iterable[str]) -> InsertManyResult:
+        processors = (FontProcessor.fromUrl(url, flip_v=True) for url in urls)
+
+        glyphsets = (
+            processor.glyphset_from_unicode_subset(get_symbols("l"))
+            for processor in processors
         )
 
-        self.db = self.client[MONGO_DATABASE]
-        self.col = self.db[MONGO_GLYPHS]
+        payload = (glyphset.to_json() for glyphset in glyphsets)
 
-        self.projection = {
-            "_id": 0,
-            "name": 1,
-            "size": 1,
-            "panose": 1,
-            "lat": 1,
-            "cyr": 1,
+        return self.fonts.insert_many(payload)
+
+
+    def addFontFile(self, file: str, drop: bool = False) -> InsertManyResult:
+        if drop:
+            self.dropFonts()
+
+        with open(file, "r") as I:
+            urls = I.readlines()
+
+        return self.addFonts(*urls)
+
+    # *------------------------------------------------------------------------* Payload Construction
+
+    def _encode(
+        self, font: Font, en: Tensor, ua: Tensor, size: int = 64
+    ) -> dict:
+        return {
+            "size": size,
+            "panose": font["panose"],
+            "name": font["font_name"],
+            "en": Binary(dumps(en, protocol=2)),
+            "ua": Binary(dumps(ua, protocol=2)),
         }
 
-    def getNames(self):
-        return self.col.distinct("name")
 
-    def getOne(self, name: str, size: int = 64) -> Dict[str, Any]:
-        return self.col.find_one({"name": name, "size": size}, self.projection)
+    def _font_to_payload(self, font: Font, size: int = 64) -> dict:
+        try:
+            en = []
+            en.extend(font.render("en"))
+            en = tensor(en)[:, :, :, 0].reshape(-1)
+        except:
+            en = empty(0)
 
-    def getAll(self, size: int = 64) -> Dict[str, Any]:
-        return self.col.find({"size": size}, self.projection)
+        try:
+            ua = []
+            ua.extend(font.render("ua"))
+            ua = tensor(ua)[:, :, :, 0].reshape(-1)
+        except:
+            ua = empty(0)
 
-    def toGlyphs(self, item: dict) -> Glyphs:
-        return Glyphs(
-            item["name"],
-            item["size"],
-            item["panose"],
-            tensor(loads(item["lat"])).view(-1, item["size"], item["size"]),
-            tensor(loads(item["cyr"])).view(-1, item["size"], item["size"]),
+        return self._encode(font, en, ua, size)
+
+
+    def _fonts_to_payload(self, fonts: Iterable[Font]) -> Iterable[dict]:
+        return (self._font_to_payload(font) for font in fonts)
+
+    # *------------------------------------------------------------------------* Rendered Glyphs Management
+
+    def dropGlyphs(self, size: int) -> DeleteResult:
+        return self.cache.delete_many({"size": size})
+
+
+    def getNames(self, size: int = 64) -> Set[str]:
+        return set(self.cache.find({"size": size}, {"_id": 0, "name": 1}))
+
+
+    def render(self, document: dict, size: int = 64) -> InsertOneResult:
+        font = Font.fromDocument(document, image_w=size, image_h=size)
+        payload = self._font_to_payload(font)
+        return self.cache.insert_one(payload)
+
+
+    def renderMany(self, documents: Iterable[dict], size: int = 64) -> InsertManyResult:
+        fonts = (
+            Font.fromDocument(document, image_w=size, image_h=size)
+            for document in documents
         )
 
-    def load(self, size: int = 64, *names: List[str]) -> Dict[str, Glyphs]:
-        return {name: self.toGlyphs(self.getOne(name, size)) for name in names}
+        payload = self._fonts_to_payload(fonts)
+        return self.cache.insert_many(payload)
 
-    def loadAll(self, size: int = 64) -> Dict[str, Glyphs]:
-        return {font["name"]: self.toGlyphs(font) for font in self.getAll(size)}
+
+    def renderAll(self, size: int = 64) -> List[str]:
+        existing: Set[str] = self.getNames(size)
+        loaded: List[str] = []
+
+        documents = filter(
+            lambda x: x["font_name"] not in existing,
+            self.fonts.find({})
+        )
+
+        try:
+            for document in documents:
+                self.render(document, size)
+                loaded.append(document["font_name"])
+        except:
+            pass
+        finally:
+            return loaded
