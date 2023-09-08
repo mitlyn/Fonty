@@ -2,19 +2,15 @@ from torch import tensor
 from pickle import dump, load, loads
 from typing import Any, List, Dict, Tuple, Iterable
 
-from pymongo import MongoClient
-
-from fonts.client import Client
+from fonts.clients import LocalClient
 from fonts.types.mongo import MongoGlyphs
 
 # TODO: batching, panose filtering, etc.
 
 
-class FontLoader(Client):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.cache = MongoClient("mongodb://192.168.1.11:27017/")["fonty"]["data"]
+class FontLoader():
+    def __init__(self, localDB: LocalClient):
+        self.cache = localDB.col
 
     def _get_glyph(self, name: str, size: int = 64) -> Dict[str, Any]:
         return self.cache.find_one({"name": name, "size": size}, {"_id": 0})

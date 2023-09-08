@@ -181,5 +181,8 @@ torch_logs/
 # Certificates
 auth/
 
+# Local Caching
+db/
+
 # Quick Ignore
 -*

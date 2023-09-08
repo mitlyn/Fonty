@@ -1,6 +1,7 @@
 import falcon
 import falcon.asgi
 
+from fonts.clients import RemoteClient, LocalClient
 from fonts.manager import FontManager
 
 # *----------------------------------------------------------------------------* App & Middleware
@@ -81,7 +82,9 @@ async def ErrorHandler(I, O, ex, params):
 
 # *----------------------------------------------------------------------------* Services
 
-manager = FontManager()
+localDB = LocalClient()
+remoteDB = RemoteClient()
+manager = FontManager(remoteDB, localDB)
 
 # *----------------------------------------------------------------------------* Routing
 
