@@ -24,7 +24,8 @@ class RemoteClient:
 LOCAL_DATABASE = "fonty"
 LOCAL_COLLECTION = "data"
 LOCAL_CONFIG = {
-    "host": "192.168.1.11",
+    # "host": "192.168.1.11", # local network
+    "host": "169.254.130.43", # direct wired connection (link-local)
     "port": 27017,
 }
 

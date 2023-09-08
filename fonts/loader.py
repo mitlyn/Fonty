@@ -1,6 +1,7 @@
+import pickle as pkl
 from torch import tensor
-from pickle import dump, load, loads
-from typing import Any, List, Dict, Tuple, Iterable
+from typing import List, Union
+from pymongo.cursor import Cursor
 
 from fonts.clients import LocalClient
 from fonts.types.mongo import MongoGlyphs
@@ -12,76 +13,70 @@ class FontLoader():
     def __init__(self, localDB: LocalClient):
         self.cache = localDB.col
 
-    def _get_glyph(self, name: str, size: int = 64) -> Dict[str, Any]:
+    # *------------------------------------------------------------------------* Retrieval
+
+    def getFont(self, name: str, size: int = 64) -> dict:
         return self.cache.find_one({"name": name, "size": size}, {"_id": 0})
 
 
-    def _get_glyphs(self, size: int = 64) -> Dict[str, Any]:
+    def getFonts(self, size: int = 64) -> Cursor:
         return self.cache.find({"size": size}, {"_id": 0})
 
+    # *------------------------------------------------------------------------* Decoding
 
-    def _decode(self, item: dict) -> MongoGlyphs:
+    def decode(self, item: dict) -> MongoGlyphs:
         return MongoGlyphs(
             name=item["name"],
             size=item["size"],
-            panose=item["panose"],
-            en=tensor(loads(item["en"])).view(-1, item["size"], item["size"]),
-            ua=tensor(loads(item["ua"])).view(-1, item["size"], item["size"]),
+            panose=tensor(item["panose"]),
+            en=tensor(pkl.loads(item["en"])).view(-1, item["size"], item["size"]),
+            ua=tensor(pkl.loads(item["ua"])).view(-1, item["size"], item["size"]),
         )
 
+    # *------------------------------------------------------------------------*  Loading & Saving
 
-    def loadMany(self, size: int = 64, *names: Iterable[str]) -> Dict[str, MongoGlyphs]:
-        return {name: self._decode(self._get_glyph(name, size)) for name in names}
+    def save(self, base, train, test, dir: str = "./data") -> None:
+        with open(f"{dir}/base.pkl", "wb") as O:
+            pkl.dump(base, O)
+
+        with open(f"{dir}/train.pkl", "wb") as O:
+            pkl.dump(train, O)
+
+        with open(f"{dir}/test.pkl", "wb") as O:
+            pkl.dump(test, O)
 
 
-    def loadAll(self, size: int = 64) -> Dict[str, MongoGlyphs]:
-        return {font["name"]: self._decode(font) for font in self._get_glyphs(size)}
+    def download(self, size: int = 64, base_font: str = "Open Sans Light", dir: str = "./data") -> None:
+        """Downloads data, splits it into train and test and saves it locally"""
 
+        base = None # single content reference font
+        train = [] # fonts with Latin and Cyrillic
+        test = [] # Latin-only fonts
 
-    # *------------------------------------------------------------------------*  Loading Data
+        data: Cursor = self.getFonts(size)
 
+        for item in data:
+            font = self.decode(item)
+            print(f"{font.name} →", end=" ")
 
-    def load(self, size: int = 64, base_font: str = "Open Sans Light"):
-        """Loads all rendered data and splits it into train and test sets."""
-
-        data = self.loadAll(size)
-        base = data.pop(base_font)
-
-        train = [] # fonts with Latin and Cyrillic glyphs
-        test = [] # fonts with only Latin glyphs
-
-        for name in data:
-            if (len(data[name].en) == 0):
-                continue
-
-            if (len(data[name].ua) > 0):
-                train.append(data[name])
+            if font.name == base_font:
+                base = font
+                print("Base")
+            elif len(font.en) == 0:
+                print("Skipped")
+            elif len(font.ua) > 0:
+                train.append(font)
+                print("Train")
             else:
-                test.append(data[name])
+                test.append(font)
+                print("Test")
 
-        return base, train, test
+        self.save(base, train, test, dir)
 
 # *----------------------------------------------------------------------------* Data Caching
 
-def toCache(base, train, test, dir: str = ".") -> None:
-    with open(f"{dir}/base.pkl", "wb") as O:
-        dump(base, O)
 
-    with open(f"{dir}/train.pkl", "wb") as O:
-        dump(train, O)
+def load(path: str, dir: str = "./data") -> Union[MongoGlyphs, List[MongoGlyphs]]:
+    with open(f"{dir}/{path}.pkl", "rb") as I:
+        return pkl.load(I)
 
-    with open(f"{dir}/test.pkl", "wb") as O:
-        dump(test, O)
-
-
-def fromCache(dir: str = ".") -> Tuple[MongoGlyphs, List[MongoGlyphs], List[MongoGlyphs]]:
-    with open(f"{dir}/base.pkl", "rb") as I:
-        base = load(I)
-
-    with open(f"{dir}/train.pkl", "rb") as I:
-        train = load(I)
-
-    with open(f"{dir}/test.pkl", "rb") as I:
-        test = load(I)
-
-    return base, train, test
