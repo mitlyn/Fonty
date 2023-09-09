@@ -1,4 +1,6 @@
+from typing import Optional
 from lightning import LightningModule
+from torchmetrics import MetricCollection
 import torch, torch.nn as nn, torch.optim as op
 
 from model.blocks import Generator, Discriminator, GANLoss
@@ -12,10 +14,11 @@ from model.utils import setInit
 
 
 class Model(LightningModule):
-    def __init__(self, opt: Options):
+    def __init__(self, opt: Options, metrics: Optional[MetricCollection] = None):
         super(Model, self).__init__()
 
         self.automatic_optimization = False
+        self.metrics = metrics
 
         self.G = Generator(opt.G_filters, blocks=6, dropout=opt.G_dropout)
         setInit(self.G, opt.init_type, opt.init_gain)
@@ -123,7 +126,36 @@ class Model(LightningModule):
 
 
     def on_train_epoch_end(self) -> None:
-        self.log("loss_D_content", self.loss_D_content, on_step=False, on_epoch=True)
-        self.log("loss_D_style", self.loss_D_style, on_step=False, on_epoch=True)
-        self.log("loss_G_GAN", self.loss_G_GAN, on_step=False, on_epoch=True)
-        self.log("loss_G_L1", self.loss_G_L1, on_step=False, on_epoch=True)
+        self.log("Train D Content", self.loss_D_content, on_step=False, on_epoch=True)
+        self.log("Train D Style", self.loss_D_style, on_step=False, on_epoch=True)
+        self.log("Train G GAN", self.loss_G_GAN, on_step=False, on_epoch=True)
+        self.log("Train G L1", self.loss_G_L1, on_step=False, on_epoch=True)
+
+
+    def validation_step(self, batch: TrainBundle, batch_idx: int):
+        # Process Batch
+        self.content = batch.content.to(self.device).view(1, -1, 64, 64)
+        self.target = batch.target.to(self.device).view(1, -1, 64, 64)
+        self.style = batch.style.to(self.device).view(1, -1, 64, 64)
+        self.panose = batch.panose.to(self.device).view(-1)
+
+        self.eval()
+
+        # Forward Pass
+        with torch.no_grad():
+            self.forward()
+
+        # Compute Loss & Metrics
+        self.loss_G_L1 = self.L1(self.result, self.target)
+
+        if self.metrics:
+            self.metrics(self.result, self.target)
+
+        self.train()
+
+
+    def on_validation_epoch_end(self) -> None:
+        self.log("Valid G L1", self.loss_G_L1, on_step=False, on_epoch=True)
+        if self.metrics:
+            self.log_dict(self.metrics.compute(), on_step=False, on_epoch=True)
+            self.metrics.reset()

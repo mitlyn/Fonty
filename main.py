@@ -58,7 +58,7 @@ trainer = Trainer(max_epochs=100)
 
 # TODO: advanced checkpointing
 
-trainer.fit(model, train_loader)
+trainer.fit(model, train_loader, valid_loader)
 
 # %%---------------------------------------------------------------------------%
 
@@ -77,6 +77,6 @@ iShowMany(X.content, X.target, apply(model, X))
 # %%---------------------------------------------------------------------------%
 
 x = apply(model, X)
-iSave(x)
+iSave(x, "test")
 
 # %%---------------------------------------------------------------------------%
