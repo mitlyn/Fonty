@@ -1,13 +1,15 @@
 # %%---------------------------------------------------------------------------%
 
 from os import system
+from random import shuffle
 from lightning import Trainer
 from torch.utils.data import DataLoader
+from sklearn.model_selection import train_test_split
 
-from model.model import Model
 from fonts.loader import load
-from model.types import TrainBundle, Options
-from model.utils import apply, iShow, iShowMany, iSave, iSaveMany
+from model.model import Model
+from model.types import Options
+from model.utils import apply, bundled, iShow, iShowMany, iSave, iSaveMany
 
 # %%---------------------------------------------------------------------------%
 
@@ -21,29 +23,24 @@ content = load("base").ua
 
 # %%---------------------------------------------------------------------------%
 
-train = load("train")
+fonts = load("train")
+shuffle(fonts)
+
+# fonts = [*fonts[:10]]
 
 # %%---------------------------------------------------------------------------%
 
-# train = [*train[:8]]
+train_fonts, valid_fonts = train_test_split(fonts, test_size=0.2)
 
 # %%---------------------------------------------------------------------------%
 
-data = []
-
-for item in train:
-    data.extend(
-        TrainBundle(
-            target=t,
-            content=c,
-            style=item.en,
-            panose=item.panose,
-        ) for c, t in zip(content, item.ua)
-    )
+train_data = bundled(train_fonts, content, train=True)
+valid_data = bundled(valid_fonts, content, train=True)
 
 # %%---------------------------------------------------------------------------%
 
-loader = DataLoader(data, shuffle=True)
+train_loader = DataLoader(train_data, shuffle=True)
+valid_loader = DataLoader(valid_data, shuffle=True)
 
 # %%---------------------------------------------------------------------------%
 
@@ -51,7 +48,7 @@ opt = Options()
 
 # %%---------------------------------------------------------------------------%
 
-net = Model(opt)
+model = Model(opt)
 
 # %%---------------------------------------------------------------------------%
 
@@ -61,7 +58,7 @@ trainer = Trainer(max_epochs=100)
 
 # TODO: advanced checkpointing
 
-trainer.fit(net, loader)
+trainer.fit(model, train_loader)
 
 # %%---------------------------------------------------------------------------%
 
@@ -74,12 +71,12 @@ trainer.fit(net, loader)
 
 # %%---------------------------------------------------------------------------%
 
-X = loader.dataset[25]
-iShowMany(X.content, X.target, apply(net, X))
+X = train_loader.dataset[25]
+iShowMany(X.content, X.target, apply(model, X))
 
 # %%---------------------------------------------------------------------------%
 
-x = apply(net, X)
+x = apply(model, X)
 iSave(x)
 
 # %%---------------------------------------------------------------------------%
