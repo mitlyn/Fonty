@@ -18,7 +18,6 @@ class Model(LightningModule):
         super(Model, self).__init__()
 
         self.automatic_optimization = False
-        self.metrics = metrics
 
         self.G = Generator(opt.G_filters, blocks=6, dropout=opt.G_dropout)
         setInit(self.G, opt.init_type, opt.init_gain)
@@ -37,10 +36,18 @@ class Model(LightningModule):
         self.L1 = nn.L1Loss()
         self.LG = GANLoss(opt.gan_mode).to(self.device)
 
+        # Validation
+        self.vL1 = nn.L1Loss()
+        self.metrics = metrics
+
         # Optimizers
         self.G_optimizer = op.Adam(self.G.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
         self.Ds_optimizer = op.Adam(self.Ds.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
         self.Dc_optimizer = op.Adam(self.Dc.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+
+
+    def configure_optimizers(self):
+        return [self.G_optimizer, self.Dc_optimizer, self.Ds_optimizer], []
 
 
     def toggle_grads(self, state: bool, *nets):
@@ -49,8 +56,11 @@ class Model(LightningModule):
                 param.requires_grad = state
 
 
-    def configure_optimizers(self):
-        return [self.G_optimizer, self.Dc_optimizer, self.Ds_optimizer], []
+    def set_inputs(self, batch):
+        self.content = batch.content.to(self.device).view(1, -1, 64, 64)
+        self.target = batch.target.to(self.device).view(1, -1, 64, 64)
+        self.style = batch.style.to(self.device).view(1, -1, 64, 64)
+        self.panose = batch.panose.to(self.device).view(-1)
 
 
     def forward(self):
@@ -102,10 +112,7 @@ class Model(LightningModule):
 
     def training_step(self, batch: TrainBundle, batch_idx: int):
         # Process Batch
-        self.content = batch.content.to(self.device).view(1, -1, 64, 64)
-        self.target = batch.target.to(self.device).view(1, -1, 64, 64)
-        self.style = batch.style.to(self.device).view(1, -1, 64, 64)
-        self.panose = batch.panose.to(self.device).view(-1)
+        self.set_inputs(batch)
 
         # Forward Pass
         self.forward()
@@ -134,10 +141,7 @@ class Model(LightningModule):
 
     def validation_step(self, batch: TrainBundle, batch_idx: int):
         # Process Batch
-        self.content = batch.content.to(self.device).view(1, -1, 64, 64)
-        self.target = batch.target.to(self.device).view(1, -1, 64, 64)
-        self.style = batch.style.to(self.device).view(1, -1, 64, 64)
-        self.panose = batch.panose.to(self.device).view(-1)
+        self.set_inputs(batch)
 
         self.eval()
 
@@ -146,7 +150,7 @@ class Model(LightningModule):
             self.forward()
 
         # Compute Loss & Metrics
-        self.loss_G_L1 = self.L1(self.result, self.target)
+        self.val_loss_L1 = self.vL1(self.result, self.target)
 
         if self.metrics:
             self.metrics(self.result, self.target)
@@ -155,7 +159,7 @@ class Model(LightningModule):
 
 
     def on_validation_epoch_end(self) -> None:
-        self.log("Valid G L1", self.loss_G_L1, on_step=False, on_epoch=True)
+        self.log("Valid G L1", self.val_loss_L1, on_step=False, on_epoch=True)
         if self.metrics:
             self.log_dict(self.metrics.compute(), on_step=False, on_epoch=True)
             self.metrics.reset()

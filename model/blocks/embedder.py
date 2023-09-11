@@ -1,6 +1,6 @@
 import torch.nn as nn
-from torch import tensor, cat, int64, float32
 from torch.nn.functional import one_hot
+from torch import tensor, cat, int64, float32
 
 from model.blocks import *
 
@@ -15,19 +15,19 @@ classes = tensor((6, 16, 12, 10, 10, 11, 12, 16, 14, 8), dtype=int64)
 # *----------------------------------------------------------------------------* Linear Embedder
 
 class LinearEmbedder(nn.Module):
-    def __init__(self, filters=64, blocks=2):
+    def __init__(self, filters=64):
         super(LinearEmbedder, self).__init__()
 
-        model = [Residual(EmbedderBlock(115)) for _ in range(blocks)]
+        self.latent = nn.Sequential(
+            nn.Linear(155, 155),
+            nn.GELU()
+        )
 
-        model += [
+        self.outer = nn.Sequential(
             nn.Linear(115, filters * 4), # { filters**3 // 4 | filters * 4}
-            nn.LeakyReLU(inplace=True),
+            nn.GELU(),
             # nn.Unflatten(0, (1, filters * 4, filters // 4, filters // 4))
-        ]
-
-        self.model = nn.Sequential(*model)
-
+        )
 
     def forward(self, panose):
         encoded = cat([
@@ -37,7 +37,10 @@ class LinearEmbedder(nn.Module):
             ) for i in range(10)
         ]).to(float32)
 
-        return self.model(encoded)
+        out = self.latent(encoded)
+        out = self.outer(encoded + out)
+
+        return out
 
 
 # *----------------------------------------------------------------------------* Attention Embedder

@@ -4,7 +4,6 @@ from model.blocks.decoder_block import DecoderBlock
 from model.blocks.encoder import Encoder
 from model.blocks.decoder import Decoder
 
-from model.blocks.embedder_block import EmbedderBlock
 from model.blocks.embedder import LinearEmbedder
 
 from model.blocks.self_attention import SelfAttention

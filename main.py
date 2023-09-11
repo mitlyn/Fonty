@@ -2,9 +2,12 @@
 
 from os import system
 from random import shuffle
+from seaborn import heatmap
 from lightning import Trainer
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
+from torch import save as saveModel, load as loadModel
+from torchmetrics import MetricCollection, image as mi
 
 from fonts.loader import load
 from model.model import Model
@@ -45,10 +48,19 @@ valid_loader = DataLoader(valid_data, shuffle=True)
 # %%---------------------------------------------------------------------------%
 
 opt = Options()
+opt.G_dropout = 0.1
+
+metrics = MetricCollection({
+    "PSNR": mi.PeakSignalNoiseRatio(),
+    "RASE": mi.RelativeAverageSpectralError(),
+    "SSIM": mi.StructuralSimilarityIndexMeasure(),
+    "RMSE-SW": mi.RootMeanSquaredErrorUsingSlidingWindow(),
+    "ERGAS": mi.ErrorRelativeGlobalDimensionlessSynthesis(),
+})
 
 # %%---------------------------------------------------------------------------%
 
-model = Model(opt)
+model = Model(opt, metrics)
 
 # %%---------------------------------------------------------------------------%
 
@@ -56,13 +68,12 @@ trainer = Trainer(max_epochs=100)
 
 # %%---------------------------------------------------------------------------%
 
-# TODO: advanced checkpointing
-
 trainer.fit(model, train_loader, valid_loader)
 
 # %%---------------------------------------------------------------------------%
 
-# TODO: loading from checkpoints doesn't work
+saveModel(model, "small.pt")
+# model = loadModel("model.pt")
 
 # net.to_onnx("model.onnx", X)
 # trainer.save_checkpoint("model.ckpt")
@@ -71,8 +82,12 @@ trainer.fit(model, train_loader, valid_loader)
 
 # %%---------------------------------------------------------------------------%
 
-X = train_loader.dataset[25]
+X = valid_loader.dataset[2]
 iShowMany(X.content, X.target, apply(model, X))
+
+# for i in range(26):
+#     X = valid_loader.dataset[i]
+#     iShowMany(X.content, X.target, apply(model, X))
 
 # %%---------------------------------------------------------------------------%
 
