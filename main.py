@@ -12,13 +12,9 @@ from torchmetrics import MetricCollection, image as mi
 from fonts.loader import load
 from model.model import Model
 from model.types import Options
-from model.utils import apply, bundled, iShow, iShowMany, iSave, iSaveMany
+from model.utils import apply, bundled, iShow, iShowMany, iSave, iSaveMany, i2Save, i3Save, is3Save
 
-# %%---------------------------------------------------------------------------%
-
-# TODO: data downloading
-
-# %%---------------------------------------------------------------------------%
+# %%---------------------------------------------------------------------------% Loading Data
 
 # Base font is a reference of how symbols should look like.
 # It's same for all model training and inference data bundles.
@@ -29,26 +25,26 @@ content = load("base").ua
 fonts = load("train")
 shuffle(fonts)
 
+# %%---------------------------------------------------------------------------% Font Selection
 # fonts = [*fonts[:10]]
 
 # %%---------------------------------------------------------------------------%
 
 train_fonts, valid_fonts = train_test_split(fonts, test_size=0.2)
 
-# %%---------------------------------------------------------------------------%
+# %%---------------------------------------------------------------------------% Bundles & Loaders
 
 train_data = bundled(train_fonts, content, train=True)
 valid_data = bundled(valid_fonts, content, train=True)
 
-# %%---------------------------------------------------------------------------%
-
 train_loader = DataLoader(train_data, shuffle=True)
 valid_loader = DataLoader(valid_data, shuffle=True)
 
-# %%---------------------------------------------------------------------------%
+# %%---------------------------------------------------------------------------% Model Setup
 
 opt = Options()
 opt.G_dropout = 0.1
+opt.lr = 1e-4
 
 metrics = MetricCollection({
     "PSNR": mi.PeakSignalNoiseRatio(),
@@ -58,15 +54,13 @@ metrics = MetricCollection({
     "ERGAS": mi.ErrorRelativeGlobalDimensionlessSynthesis(),
 })
 
-# %%---------------------------------------------------------------------------%
-
 model = Model(opt, metrics)
 
-# %%---------------------------------------------------------------------------%
+# %%---------------------------------------------------------------------------% Trainer Setup
 
 trainer = Trainer(max_epochs=100)
 
-# %%---------------------------------------------------------------------------%
+# %%---------------------------------------------------------------------------% Training
 
 trainer.fit(model, train_loader, valid_loader)
 
