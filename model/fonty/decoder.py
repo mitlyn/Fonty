@@ -1,9 +1,9 @@
 import torch.nn as nn
 
-from model.blocks import *
+from model.share import Residual
+from model.fonty import DecoderBlock
 
 # *----------------------------------------------------------------------------*
-
 
 class Decoder(nn.Module):
     def __init__(self, filters: int = 64, blocks: int = 6, dropout: bool = False):

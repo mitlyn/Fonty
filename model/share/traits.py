@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-# *----------------------------------------------------------------------------* Residual Decorator
+# *----------------------------------------------------------------------------* Residual Trait
 
 class Residual(nn.Module):
     def __init__(self, block: nn.Module):
@@ -11,11 +11,9 @@ class Residual(nn.Module):
     def forward(self, X):
         return X + self.block(X)
 
+# *----------------------------------------------------------------------------* Normalized Trait
 
-# *----------------------------------------------------------------------------* PreNorm Decorator
-
-
-class Normalized(nn.Module):
+class Normal(nn.Module):
     def __init__(self, dim: int, block: nn.Module):
         super().__init__()
 

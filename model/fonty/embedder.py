@@ -2,8 +2,6 @@ import torch.nn as nn
 from torch.nn.functional import one_hot
 from torch import tensor, zeros, arange, cat, int64, float32
 
-from model.blocks import *
-
 # TODO: Panose Batches
 # TODO: CLS Token
 

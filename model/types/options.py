@@ -25,8 +25,8 @@ class Options:
     G_dropout: bool = False
     # number of discriminator blocks
     D_layers: int = 3
-    # type of GAN objective. [vanilla| lsgan | wgangp | hinge]. vanilla GAN loss is the cross-entropy objective used in the original GAN paper.
-    gan_mode: str = "hinge"
+    # GAN objective function: { vanilla, lsgan, wgangp, hinge }
+    objective: str = "hinge"
     # weight for content loss
     lambda_content: float = 1.0
     # weight for style loss

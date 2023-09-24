@@ -1,9 +1,6 @@
 import torch.nn as nn
 
-from model.blocks import *
-
 # *----------------------------------------------------------------------------*
-
 
 class Encoder(nn.Module):
     def __init__(self, dim: int, filters: int = 64):

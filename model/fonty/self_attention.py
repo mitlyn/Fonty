@@ -1,10 +1,7 @@
 import torch.nn as nn
 from torch import zeros, bmm
 
-from model.blocks import *
-
 # *----------------------------------------------------------------------------*
-
 
 class SelfAttention(nn.Module):
     def __init__(self, dim: int):
@@ -19,11 +16,11 @@ class SelfAttention(nn.Module):
 
     def forward(self, X):
         """
-            inputs :
+            Inputs:
                 x : input feature maps(B × C × H × W)
-            returns :
-                out : self attention value + input feature
-                attention: B × N × N (N is Width * Height)
+            Returns:
+                out       : self attention value + input feature
+                attention : B × N × N (N is Width * Height)
         """
         B, C, H, W = X.size()
         N = H * W
@@ -35,7 +32,6 @@ class SelfAttention(nn.Module):
         value = self.value_conv(X).view(B, -1, N)
 
         out = bmm(value, attention.permute(0, 2, 1))
-        out = out.view(B, C, H, W)
-        out = X + out * self.gamma
+        out = X + out.view(B, C, H, W) * self.gamma
 
         return out

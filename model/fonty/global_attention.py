@@ -1,15 +1,11 @@
 import torch.nn as nn
 from torch import mean, randn
 
-from model.blocks import *
-
 # *----------------------------------------------------------------------------*
-
 
 class GlobalAttention(nn.Module):
     def __init__(self, filters: int = 64):
         super(GlobalAttention, self).__init__()
-
         self.filters = filters
 
     def forward(self, features, B, K):

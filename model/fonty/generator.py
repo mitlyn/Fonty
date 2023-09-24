@@ -1,10 +1,9 @@
 import torch.nn as nn
 from torch import cat
 
-from model.blocks import *
+from model.fonty import Encoder, Decoder, LinearEmbedder, LocalAttention, LayerAttention
 
 # *----------------------------------------------------------------------------*
-
 
 class Generator(nn.Module):
     def __init__(self, filters: int = 64, blocks: int = 6, dropout: bool = False):
@@ -35,8 +34,7 @@ class Generator(nn.Module):
             nn.ReLU(True)
         )
 
-    def forward(self, X):
-        content_image, style_images, panose = X
+    def forward(self, content_image, style_images, panose):
         B, K, N, _ = style_images.shape
 
         content_features = self.Ec(content_image)

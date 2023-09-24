@@ -177,6 +177,7 @@ lightning_logs/
 torch_logs/
 *.ckpt
 *.onnx
+*.pt
 
 # Certificates
 auth/

@@ -1,0 +1,28 @@
+{
+  "exclude": [
+    // Utility Folders
+    "**/lightning_logs",
+    "**/node_modules",
+    "**/__pycache__",
+    // Data Folders
+    "/dumps",
+    "/data",
+    // File Types
+    "**/*.ckpt",
+    "**/*.html",
+    "**/*.json",
+    "**/*.toml",
+    "**/*.yml",
+    "**/*.csv",
+    "**/*.txt",
+    "**/*.nam",
+    "**/*.pem",
+    "**/*.pkl",
+    "**/*.pt",
+    "**/*.jl",
+    "**/*.md",
+    // Hidden Files
+    "**/-*",
+    "**/.*",
+  ]
+}

@@ -1,14 +1,14 @@
 import torch.nn as nn
 from torch import tanh, sum
 
-from model.blocks import *
+from model.fonty import SelfAttention
 
 # *----------------------------------------------------------------------------*
-
 
 class LocalAttention(nn.Module):
     def __init__(self, filters: int = 64):
         super(LocalAttention, self).__init__()
+
         self.self_attention = SelfAttention(filters * 4)
         self.attention = nn.Linear(filters * 4, 100)
         self.context = nn.Linear(100, 1, bias=False)

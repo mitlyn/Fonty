@@ -3,23 +3,21 @@ from lightning import LightningModule
 from torchmetrics import MetricCollection
 import torch, torch.nn as nn, torch.optim as op
 
-from model.blocks import Generator, Discriminator, GANLoss
+from model.emd import Generator
+from model.share import Discriminator, Hinge, WGANGP
 from model.types import TrainBundle, Options
 from model.utils import setInit
-
-# TODO: callbacks, learning rate schedulers
-# TODO: metrics
 
 # *----------------------------------------------------------------------------*
 
 
-class Model(LightningModule):
+class EMD(LightningModule):
     def __init__(self, opt: Options, metrics: Optional[MetricCollection] = None):
-        super(Model, self).__init__()
+        super(EMD, self).__init__()
 
         self.automatic_optimization = False
 
-        self.G = Generator(opt.G_filters, blocks=6, dropout=opt.G_dropout)
+        self.G = Generator(opt.refs, 1)
         setInit(self.G, opt.init_type, opt.init_gain)
 
         self.Dc = Discriminator(2, opt.D_filters, opt.D_layers)
@@ -28,13 +26,14 @@ class Model(LightningModule):
         self.Ds = Discriminator(opt.refs + 1, opt.D_filters, opt.D_layers)
         setInit(self.Ds, opt.init_type, opt.init_gain)
 
-        # Loss Functions
+        # Loss Functions & Lambdas (loss importance coefficients)
         self.lambda_L1 = opt.lambda_L1
         self.lambda_style = opt.lambda_style
         self.lambda_content = opt.lambda_content
 
-        self.L1 = nn.L1Loss()
-        self.LG = GANLoss(opt.gan_mode).to(self.device)
+        self.Lh = Hinge().to(self.device)   # Discriminator Only Loss
+        self.Lw = WGANGP().to(self.device)  # Generator Only Loss
+        self.L1 = nn.L1Loss()               # Regular Loss
 
         # Validation
         self.vL1 = nn.L1Loss()
@@ -60,22 +59,21 @@ class Model(LightningModule):
         self.content = batch.content.to(self.device).view(1, -1, 64, 64)
         self.target = batch.target.to(self.device).view(1, -1, 64, 64)
         self.style = batch.style.to(self.device).view(1, -1, 64, 64)
-        self.panose = batch.panose.to(self.device).view(-1)
 
 
     def forward(self):
-        self.result = self.G((self.content, self.style, self.panose))
+        self.result = self.G(self.content, self.style)
 
 
     def D_loss(self, real_images, fake_images, discriminator):
-        # Fake Loss
+        # Discriminator Loss on Fake data
         fake = torch.cat(fake_images, 1)
         pred_fake = discriminator(fake.detach())
-        loss_D_fake = self.LG(pred_fake, False)
-        # Real Loss
+        loss_D_fake = self.Lh(pred_fake, False)
+        # Discriminator Loss on Real data
         real = torch.cat(real_images, 1)
         pred_real = discriminator(real)
-        loss_D_real = self.LG(pred_real, True)
+        loss_D_real = self.Lh(pred_real, True)
         # Combined Loss
         return (loss_D_fake + loss_D_real) * 0.5
 
@@ -83,40 +81,37 @@ class Model(LightningModule):
     def G_loss(self, fake_images, discriminator):
         fake = torch.cat(fake_images, 1)
         pred_fake = discriminator(fake)
-        # Generator Loss
-        return self.LG(pred_fake, True, True)
+        # Loss according to Discriminator
+        return self.Lw(pred_fake, True)
 
 
     def D_back(self):
-        """Calculate Discriminator loss"""
+        """Backpropagate Discriminator"""
         self.loss_D_content = self.D_loss([self.content, self.target],  [self.content, self.result], self.Dc)
         self.loss_D_style = self.D_loss([self.style, self.target], [self.style, self.result], self.Ds)
+        # Combined Loss
         self.loss_D = self.loss_D_content * self.lambda_content + self.loss_D_style * self.lambda_style
-
         self.loss_D.backward()
 
 
     def G_back(self):
-        """Calculate Generator loss (L1 & GAN)"""
-        # First, G(A) should fake the discriminator
+        """Backpropagate Generator"""
+        # Discriminator Loss
         self.loss_G_content = self.G_loss([self.content, self.result], self.Dc)
         self.loss_G_style = self.G_loss([self.style, self.result], self.Ds)
         self.loss_G_GAN = self.lambda_content * self.loss_G_content + self.lambda_style * self.loss_G_style
-
-        # Second, G(A) = B
+        # Generator Loss
         self.loss_G_L1 = self.L1(self.result, self.target)
+        # Combined Loss
         self.loss_G = self.loss_G_GAN + self.loss_G_L1 * self.lambda_L1
-
         self.loss_G.backward()
 
 
     def training_step(self, batch: TrainBundle, batch_idx: int):
         # Process Batch
         self.set_inputs(batch)
-
         # Forward Pass
         self.forward()
-
         # Update Discriminators
         self.toggle_grads(True, self.Dc, self.Ds)
         self.Dc_optimizer.zero_grad()
@@ -124,12 +119,26 @@ class Model(LightningModule):
         self.D_back()
         self.Dc_optimizer.step()
         self.Ds_optimizer.step()
-
         # Update Generator
         self.toggle_grads(False, self.Dc, self.Ds)
         self.G_optimizer.zero_grad()
         self.G_back()
         self.G_optimizer.step()
+
+        # # self.loss_L1 = torch.mean(torch.abs(self.generated_images-self.gt_images))
+        # weight = self.compute_weight()
+        # self.loss_L1 = torch.mean(torch.sum(torch.abs(self.generated_images-self.gt_images), dim=[1, 2, 3])*weight)
+        # self.loss_L1.backward()
+
+        # def compute_weight(self):
+        #     gt_images = self.gt_images / 2.0 + 0.5
+        #     batch_size = gt_images.shape[0]
+        #     black_pixels = gt_images < 0.5
+        #     num_black_pixels = torch.sum(black_pixels, dim=[1, 2, 3]) + 1
+        #     new_tensor = torch.where(black_pixels, gt_images, torch.tensor(0.).to(self.device))
+        #     mean_black_pixels = torch.sum(new_tensor, dim=[1, 2, 3]) / num_black_pixels
+        #     weight = torch.nn.functional.softmax(mean_black_pixels, dim=0)*batch_size / num_black_pixels
+        #     return weight
 
 
     def on_train_epoch_end(self) -> None:
@@ -142,19 +151,17 @@ class Model(LightningModule):
     def validation_step(self, batch: TrainBundle, batch_idx: int):
         # Process Batch
         self.set_inputs(batch)
-
+        # Set to Eval Mode
         self.eval()
-
         # Forward Pass
         with torch.no_grad():
             self.forward()
-
-        # Compute Loss & Metrics
+        # Compute Loss
         self.val_loss_L1 = self.vL1(self.result, self.target)
-
+        # Compute Metrics
         if self.metrics:
             self.metrics(self.result, self.target)
-
+        # Set to Train Mode
         self.train()
 
 
@@ -163,3 +170,13 @@ class Model(LightningModule):
         if self.metrics:
             self.log_dict(self.metrics.compute(), on_step=False, on_epoch=True)
             self.metrics.reset()
+
+
+# *----------------------------------------------------------------------------*
+
+# class EMDModel(BaseModel):
+
+#     # self.loss_bottom = torch.tensor(1.0, dtype=torch.float).to(self.device)
+
+
+

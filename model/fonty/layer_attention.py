@@ -1,15 +1,11 @@
 import torch.nn as nn
 from torch import mean, randn
 
-from model.blocks import *
-
 # *----------------------------------------------------------------------------*
-
 
 class LayerAttention(nn.Module):
     def __init__(self, filters: int = 64):
         super(LayerAttention, self).__init__()
-
         self.filters = filters
 
         self.linear = nn.Linear(4096, 3)
