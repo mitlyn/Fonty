@@ -23,13 +23,27 @@ class Generator(nn.Module):
         self.bilinear = nn.Bilinear(filters * 4, 1, filters * 4)
 
         self.downsample_1 = nn.Sequential(
-            nn.Conv2d(filters * 4, filters * 4, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.Conv2d(
+                filters * 4,
+                filters * 4,
+                kernel_size=3,
+                bias=False,
+                padding=1,
+                stride=2,
+            ),
             nn.BatchNorm2d(filters * 4),
             nn.ReLU(True)
         )
 
         self.downsample_2 = nn.Sequential(
-            nn.Conv2d(filters * 4, filters * 4, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.Conv2d(
+                filters * 4,
+                filters * 4,
+                kernel_size=3,
+                bias=False,
+                padding=1,
+                stride=2,
+            ),
             nn.BatchNorm2d(filters * 4),
             nn.ReLU(True)
         )
@@ -70,5 +84,9 @@ class Generator(nn.Module):
         font_features = font_features.view(1, N * 4, N // 4, N // 4)
 
         features = cat([content_features, font_features], dim=1)
+
+        # *--------------------------------------------------------------------* Option 3: Vanilla FTransGAN
+
+        # features = cat([content_features, style_features], dim=1)
 
         return self.D(features)

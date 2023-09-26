@@ -5,23 +5,24 @@ from os import system
 from random import shuffle
 from asq import query as Q
 from seaborn import heatmap
-from lightning import Trainer
+from pprint import pprint as pp
 from torch.onnx import export as onnx
-from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 from torch import save as saveModel, load as loadModel
-from torchmetrics import MetricCollection, image as mi
+
+from lightning import Trainer
+from torch.utils.data import DataLoader
 
 from model.emd import EMD
 from model.fonty import Fonty
 from fonts.loader import load
 from model.types import Options
-from model.utils import apply, bundled, iShow, iShowMany, iSave, iSaveMany, i2Save, i3Save, is3Save
+from model.utils.eval import Metrics, eval
+from model.utils.nets import bundled, apply
+from model.utils.show import iShow, iShowMany, iSave, iSaveMany, i2Save, i3Save, is3Save
 
-# TODO: FID, LPIPS
-# TODO: best discriminator (trained separately)
 # TODO: interchangeable generators
-# TODO: forward((..)) for easier inference
+# TODO: best discriminator (trained separately)
 
 # %%---------------------------------------------------------------------------% Loading Data
 
@@ -77,17 +78,10 @@ valid_loader = DataLoader(valid_data, shuffle=False)
 
 # %%---------------------------------------------------------------------------% Model Setup
 
-opt = Options()
+options = Options()
+metrics = Metrics()
 
-metrics = MetricCollection({
-    "PSNR": mi.PeakSignalNoiseRatio(),
-    "RASE": mi.RelativeAverageSpectralError(),
-    "SSIM": mi.StructuralSimilarityIndexMeasure(),
-    "RMSE-SW": mi.RootMeanSquaredErrorUsingSlidingWindow(),
-    "ERGAS": mi.ErrorRelativeGlobalDimensionlessSynthesis(),
-})
-
-model = EMD(opt, metrics)
+model = EMD(options, metrics)
 
 # %%---------------------------------------------------------------------------% Trainer Setup
 
@@ -99,17 +93,24 @@ trainer.fit(model, train_loader, valid_loader)
 
 # %%---------------------------------------------------------------------------%
 
-# saveModel(model, "small.pt")
-# model = loadModel("model.pt")
+# saveModel(model.to("cpu"), "model.pt")
+# model = loadModel("model.pt").to("cuda")
 
 # %%---------------------------------------------------------------------------% Result Inspection
 
-# fake = Q(train_loader.dataset).select(lambda x: x.target).to_list()
-# real = Q(train_loader.dataset).select(lambda x: x.target).to_list()
+train_score = eval(model, train_loader.dataset)
+train_score
 
-for i in range(10):
-    X = train_loader.dataset[i]
-    iShowMany(X.content, X.target, apply(model, X))
+# %%---------------------------------------------------------------------------% Result Illustration
+
+valid_score = eval(model, valid_loader.dataset)
+valid_score
+
+# %%---------------------------------------------------------------------------%
+
+X = train_loader.dataset[0]
+iShowMany(X.content, X.target, apply(model, X))
+# iSave(x, "test")
 
 # %%---------------------------------------------------------------------------% Result Illustration
 
@@ -130,13 +131,8 @@ for i in range(10):
 
 # %%---------------------------------------------------------------------------%
 
-# x = apply(model, X)
-# iSave(x, "test")
-
-# %%---------------------------------------------------------------------------%
-
-W = model.G.Ep.linear[0].weight.detach().cpu().numpy()
-heatmap(W, cmap="coolwarm")
+# W = model.G.Ep.linear[0].weight.detach().cpu().numpy()
+# heatmap(W, cmap="coolwarm")
 
 # %%---------------------------------------------------------------------------%
 
