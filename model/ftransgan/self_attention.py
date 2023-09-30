@@ -15,13 +15,6 @@ class SelfAttention(nn.Module):
         self.softmax  = nn.Softmax(-1)
 
     def forward(self, X):
-        """
-            Inputs:
-                x : input feature maps(B × C × H × W)
-            Returns:
-                out       : self attention value + input feature
-                attention : B × N × N (N is Width * Height)
-        """
         B, C, H, W = X.size()
         N = H * W
 

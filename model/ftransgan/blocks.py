@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-# *----------------------------------------------------------------------------*
+# *----------------------------------------------------------------------------* Decoder Block
 
 class DecoderBlock(nn.Module):
     def __init__(self, dim: int, padding: str, norm_layer, dropout: bool, bias: bool):
@@ -52,3 +52,27 @@ class DecoderBlock(nn.Module):
 
     def forward(self, X):
         return self.block(X)
+
+# *----------------------------------------------------------------------------* Downsampling Block For Layer Attention
+
+class FeatureScaler(nn.Module):
+    def __init__(self, dim: int):
+        super(FeatureScaler, self).__init__()
+
+        self.block = nn.Sequential(
+            nn.Conv2d(
+                dim * 4, dim * 4,
+                kernel_size=3,
+                bias=False,
+                padding=1,
+                stride=2,
+            ),
+            nn.BatchNorm2d(dim * 4),
+            nn.ReLU(True)
+        )
+
+    def forward(self, X):
+        return self.block(X)
+
+
+

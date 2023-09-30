@@ -4,7 +4,7 @@ from torch.nn.utils import spectral_norm as spectral
 # *----------------------------------------------------------------------------* Regular Discriminator
 
 class Discriminator(nn.Module):
-    def __init__(self, dim: int, filters: int = 64, layers: int = 3, norm = nn.InstanceNorm2d):
+    def __init__(self, dim: int, filters: int = 64, layers: int = 3, norm = nn.BatchNorm2d):
         super(Discriminator, self).__init__()
 
         mul = 1
@@ -23,9 +23,9 @@ class Discriminator(nn.Module):
                     filters * mul_prev,
                     filters * mul,
                     kernel_size=4,
+                    bias=False,
                     padding=1,
                     stride=2,
-                    bias=False,
                 ),
                 norm(filters * mul),
                 nn.LeakyReLU(0.2, True),
@@ -39,9 +39,9 @@ class Discriminator(nn.Module):
                 filters * mul_prev,
                 filters * mul,
                 kernel_size=4,
+                bias=False,
                 padding=1,
                 stride=1,
-                bias=False,
             ),
             norm(filters * mul),
             nn.LeakyReLU(0.2, True),
@@ -81,9 +81,9 @@ class SpectralDiscriminator(nn.Module):
                         filters * mul_prev,
                         filters * mul,
                         kernel_size=4,
+                        bias=False,
                         padding=1,
                         stride=2,
-                        bias=False,
                     )
                 ),
                 norm_layer(filters * mul),
@@ -99,9 +99,9 @@ class SpectralDiscriminator(nn.Module):
                     filters * mul_prev,
                     filters * mul,
                     kernel_size=4,
+                    bias=False,
                     padding=1,
                     stride=1,
-                    bias=False,
                 )
             ),
             norm_layer(filters * mul),

@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 from model.share import Residual
-from model.fonty import DecoderBlock
+from model.ftransgan import DecoderBlock
 
 # *----------------------------------------------------------------------------*
 

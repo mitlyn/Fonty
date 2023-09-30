@@ -13,16 +13,18 @@ from torch import save as saveModel, load as loadModel
 from lightning import Trainer
 from torch.utils.data import DataLoader
 
-from model.emd import EMD
+from model.ftransgan import FTransGAN
+from model.gasnext import GasNeXt
 from model.fonty import Fonty
+from model.emd import EMD
+
 from fonts.loader import load
 from model.types import Options
-from model.utils.eval import Metrics, eval
-from model.utils.nets import bundled, apply
+from model.utils.eval import Metrics, eval, evalPanose
+from model.utils.nets import bundled, apply, applyPanose
 from model.utils.show import iShow, iShowMany, iSave, iSaveMany, i2Save, i3Save, is3Save
 
-# TODO: interchangeable generators
-# TODO: best discriminator (trained separately)
+# TODO: frozen universal discriminator (trained separately)
 
 # %%---------------------------------------------------------------------------% Loading Data
 
@@ -81,11 +83,11 @@ valid_loader = DataLoader(valid_data, shuffle=False)
 options = Options()
 metrics = Metrics()
 
-model = EMD(options, metrics)
+model = GasNeXt(options, metrics)
 
 # %%---------------------------------------------------------------------------% Trainer Setup
 
-trainer = Trainer(max_epochs=100)
+trainer = Trainer(max_epochs=200)
 
 # %%---------------------------------------------------------------------------% Training
 
@@ -93,23 +95,27 @@ trainer.fit(model, train_loader, valid_loader)
 
 # %%---------------------------------------------------------------------------%
 
-# saveModel(model.to("cpu"), "model.pt")
-# model = loadModel("model.pt").to("cuda")
+# saveModel(model.cpu(), "model.pt")
+# model = loadModel("model.pt").cuda()
 
 # %%---------------------------------------------------------------------------% Result Inspection
 
-train_score = eval(model, train_loader.dataset)
-train_score
+train_score = evalPanose(model, train_loader.dataset)
+
+for k in train_score:
+    print(f"{k}: {train_score[k]}")
 
 # %%---------------------------------------------------------------------------% Result Illustration
 
-valid_score = eval(model, valid_loader.dataset)
-valid_score
+valid_score = evalPanose(model, valid_loader.dataset)
+
+for k in valid_score:
+    print(f"{k}: {valid_score[k]}")
 
 # %%---------------------------------------------------------------------------%
 
-X = train_loader.dataset[0]
-iShowMany(X.content, X.target, apply(model, X))
+X = train_loader.dataset[1272]
+iShowMany(X.content, X.target, applyPanose(model, X))
 # iSave(x, "test")
 
 # %%---------------------------------------------------------------------------% Result Illustration

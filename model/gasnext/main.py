@@ -1,23 +1,26 @@
+from random import randint
 from typing import Optional
 from lightning import LightningModule
 from torchmetrics import MetricCollection
 import torch, torch.nn as nn, torch.optim as op
 
-from model.emd import Generator
+from model.ftransgan import Generator
 from model.share import Discriminator, Hinge, WGANGP
 from model.types import TrainBundle, Options
 from model.utils import setInit, setGrads
 
 # *----------------------------------------------------------------------------*
 
-
-class EMD(LightningModule):
+class GasNeXt(LightningModule):
     def __init__(self, opt: Options, metrics: Optional[MetricCollection] = None):
-        super(EMD, self).__init__()
+        super(GasNeXt, self).__init__()
 
         self.automatic_optimization = False
 
-        self.G = Generator(opt.refs, 1)
+        self.num_block = opt.num_block
+        self.block_size = opt.block_size
+
+        self.G = Generator(opt.G_filters, blocks=6, dropout=opt.G_dropout)
         setInit(self.G, opt.init_type, opt.init_gain)
 
         self.Dc = Discriminator(2, opt.D_filters, opt.D_layers)
@@ -26,14 +29,18 @@ class EMD(LightningModule):
         self.Ds = Discriminator(opt.refs + 1, opt.D_filters, opt.D_layers)
         setInit(self.Ds, opt.init_type, opt.init_gain)
 
-        # Loss Functions & Lambdas (loss importance coefficients)
+        self.Dl = Discriminator(2 * self.num_block, opt.D_filters, opt.D_layers)
+        setInit(self.Ds, opt.init_type, opt.init_gain)
+
+        # Loss Functions
         self.lambda_L1 = opt.lambda_L1
+        self.lambda_local = opt.lambda_local
         self.lambda_style = opt.lambda_style
         self.lambda_content = opt.lambda_content
 
         self.Lh = Hinge().to(self.device)   # Discriminator Only Loss
         self.Lw = WGANGP().to(self.device)  # Generator Only Loss
-        self.L1 = nn.L1Loss()               # Regular Loss
+        self.L1 = nn.L1Loss()               # Pixel-wise Loss
 
         # Validation
         self.vL1 = nn.L1Loss()
@@ -43,10 +50,11 @@ class EMD(LightningModule):
         self.G_optimizer = op.Adam(self.G.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
         self.Ds_optimizer = op.Adam(self.Ds.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
         self.Dc_optimizer = op.Adam(self.Dc.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+        self.Dl_optimizer = op.Adam(self.Dc.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
 
     def configure_optimizers(self):
-        return [self.G_optimizer, self.Dc_optimizer, self.Ds_optimizer], []
+        return [self.G_optimizer, self.Dc_optimizer, self.Ds_optimizer, self.Dl_optimizer], []
 
 
     def set_inputs(self, batch):
@@ -55,8 +63,50 @@ class EMD(LightningModule):
         self.style = batch.style.to(self.device).view(1, -1, 64, 64)
 
 
+    def cut_patch(self, fake_images, real_images, true_images):
+        batch_size, style_size, H, W = real_images.shape
+        fake_block, real_block, true_block = [], [], []
+
+        for b in range(batch_size):
+            for i in range(self.num_block):
+                style_idx = randint(0, style_size-1)
+                x = randint(0, H - self.block_size - 1)
+                y = randint(0, W - self.block_size - 1)
+
+                real_random_block = real_images.clone().detach().requires_grad_(False)
+                real_random_block = real_random_block[b, style_idx, x:x+self.block_size, y:y+self.block_size].unsqueeze(0)
+
+                fake_random_block = fake_images.clone().detach().requires_grad_(False)
+                fake_random_block = fake_random_block[b, 0, x:x+self.block_size, y:y+self.block_size].unsqueeze(0)
+
+                gt_random_block = true_images.clone().detach().requires_grad_(False)
+                gt_random_block = gt_random_block[b, 0, x:x+self.block_size, y:y+self.block_size].unsqueeze(0)
+
+                if i == 0:
+                    real_blocks = real_random_block
+                    fake_blocks = fake_random_block
+                    real_blocks = gt_random_block
+                else:
+                    real_blocks = torch.cat([real_blocks, real_random_block], dim=0)
+                    fake_blocks = torch.cat([fake_blocks, fake_random_block], dim=0)
+                    real_blocks = torch.cat([real_blocks, gt_random_block], dim=0)
+
+            real_block.append(real_blocks.unsqueeze(0))
+            fake_block.append(fake_blocks.unsqueeze(0))
+            true_block.append(real_blocks.unsqueeze(0))
+
+        real_block = torch.cat(real_block)
+        fake_block = torch.cat(fake_block)
+        true_block = torch.cat(true_block)
+
+        return fake_block, real_block, true_block
+
+
     def forward(self):
         self.result = self.G(self.content, self.style)
+
+        self.fake_blocks, self.real_blocks, self.true_blocks = \
+            self.cut_patch(self.result, self.style, self.target)
 
 
     def D_loss(self, real_images, fake_images, discriminator):
@@ -82,10 +132,15 @@ class EMD(LightningModule):
 
     def D_back(self):
         """Backpropagate Discriminator"""
+        self.loss_D_local = self.D_loss([self.real_blocks, self.true_blocks],[self.real_blocks, self.fake_blocks], self.Dl)
         self.loss_D_content = self.D_loss([self.content, self.target],  [self.content, self.result], self.Dc)
         self.loss_D_style = self.D_loss([self.style, self.target], [self.style, self.result], self.Ds)
         # Combined Loss
-        self.loss_D = self.loss_D_content * self.lambda_content + self.loss_D_style * self.lambda_style
+        self.loss_D = (
+            self.loss_D_content * self.lambda_content +
+            self.loss_D_style * self.lambda_style +
+            self.loss_D_local * self.lambda_local
+        )
         # Calculate Gradients
         self.loss_D.backward()
 
@@ -93,9 +148,14 @@ class EMD(LightningModule):
     def G_back(self):
         """Backpropagate Generator"""
         # Discriminator Loss
+        self.loss_G_local = self.G_loss([self.real_blocks, self.fake_blocks], self.Dl)
         self.loss_G_content = self.G_loss([self.content, self.result], self.Dc)
         self.loss_G_style = self.G_loss([self.style, self.result], self.Ds)
-        self.loss_G_GAN = self.lambda_content * self.loss_G_content + self.lambda_style * self.loss_G_style
+        self.loss_G_GAN = (
+            self.lambda_content * self.loss_G_content +
+            self.lambda_style * self.loss_G_style +
+            self.lambda_local * self.loss_G_local
+        )
         # Generator Loss
         self.loss_G_L1 = self.L1(self.result, self.target)
         # Combined Loss
@@ -110,32 +170,19 @@ class EMD(LightningModule):
         # Forward Pass
         self.forward()
         # Update Discriminators
-        setGrads(True, self.Dc, self.Ds)
+        setGrads(True, self.Dc, self.Ds, self.Dl)
         self.Dc_optimizer.zero_grad()
         self.Ds_optimizer.zero_grad()
+        self.Dl_optimizer.zero_grad()
         self.D_back()
         self.Dc_optimizer.step()
         self.Ds_optimizer.step()
+        self.Dl_optimizer.step()
         # Update Generator
-        setGrads(False, self.Dc, self.Ds)
+        setGrads(False, self.Dc, self.Ds, self.Dl)
         self.G_optimizer.zero_grad()
         self.G_back()
         self.G_optimizer.step()
-
-        # # self.loss_L1 = torch.mean(torch.abs(self.generated_images-self.gt_images))
-        # weight = self.compute_weight()
-        # self.loss_L1 = torch.mean(torch.sum(torch.abs(self.generated_images-self.gt_images), dim=[1, 2, 3])*weight)
-        # self.loss_L1.backward()
-
-        # def compute_weight(self):
-        #     gt_images = self.gt_images / 2.0 + 0.5
-        #     batch_size = gt_images.shape[0]
-        #     black_pixels = gt_images < 0.5
-        #     num_black_pixels = torch.sum(black_pixels, dim=[1, 2, 3]) + 1
-        #     new_tensor = torch.where(black_pixels, gt_images, torch.tensor(0.).to(self.device))
-        #     mean_black_pixels = torch.sum(new_tensor, dim=[1, 2, 3]) / num_black_pixels
-        #     weight = torch.nn.functional.softmax(mean_black_pixels, dim=0)*batch_size / num_black_pixels
-        #     return weight
 
 
     def on_train_epoch_end(self) -> None:

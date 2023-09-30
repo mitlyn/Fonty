@@ -6,7 +6,7 @@ from typing import Any, List, Dict, Union
 from torch import stack, uint8
 from torchmetrics import MetricCollection, image as mi
 
-from model.utils.nets import apply
+from model.utils.nets import apply, applyPanose
 
 # *----------------------------------------------------------------------------* Metrics
 
@@ -72,5 +72,54 @@ def eval(model: Module, data: List[Bundle]) -> Dict[str, Any]:
     # LPIPS.update(real, fake)
 
     # result["LPIPS"] = LPIPS.compute().item()
+
+    return result
+
+# *----------------------------------------------------------------------------* Evaluation
+
+def evalPanose(model: Module, data: List[Bundle]) -> Dict[str, Any]:
+    fake: Union[List[Tensor], Tensor] = []
+    real: Union[List[Tensor], Tensor] = []
+    metrics = Metrics()
+
+    # Collecting & Preparing Data
+
+    for item in data:
+        fake.append(applyPanose(model, item))
+        real.append(item.target)
+
+    fake = stack(fake).view(-1, 1, 64, 64)
+    real = stack(real).view(-1, 1, 64, 64)
+
+    # Regular Metrics
+
+    metrics.update(fake, real)
+    result = metrics.compute()
+
+    result = {k: v.item() for k, v in result.items()}
+
+    # Casting to 3-Channel Images
+
+    fake = (fake * 255).to(uint8).repeat(1, 3, 1, 1)
+    real = (real * 255).to(uint8).repeat(1, 3, 1, 1)
+
+    # Frechet Inception Distance
+
+    FID = mi.FrechetInceptionDistance(64)
+
+    FID.update(real, True)
+    FID.update(fake, False)
+
+    result["FID"] = FID.compute().item()
+
+    # Memorization Informed Frechet Inception Distance
+
+    mFID = mi.MemorizationInformedFrechetInceptionDistance(64)
+    mFID.update(fake, False)
+    mFID.update(real, True)
+
+    result["mFID"] = mFID.compute().item()
+
+    # TODO: LPIPS
 
     return result

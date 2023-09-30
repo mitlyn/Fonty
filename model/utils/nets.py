@@ -29,8 +29,8 @@ def apply(model: Module, data: Bundle) -> Tensor:
 def applyPanose(model: Module, data: Bundle) -> Tensor:
     """Apply panose-conditioned font style transfer."""
     content = data.content.view(1, -1, 64, 64).cuda()
-    panose = data.panose.view(1, -1, 64, 64).cuda()
     style = data.style.view(1, -1, 64, 64).cuda()
+    panose = data.panose.view(-1).cuda()
     return __call(model, content, style, panose)
 
 # *----------------------------------------------------------------------------* Create Bundles
@@ -86,3 +86,10 @@ def setInit(model: Module, method: Inits = 'normal', gain: float = 0.02) -> None
             init.constant_(node.bias.data, 0.0)
 
     model.apply(func)
+
+# *----------------------------------------------------------------------------* Toggle Gradients
+
+def setGrads(state: bool, *nets: Any):
+    for net in nets:
+        for param in net.parameters():
+            param.requires_grad = state

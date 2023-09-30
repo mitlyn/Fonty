@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torch import tanh, sum
 
-from model.fonty import SelfAttention
+from model.ftransgan import SelfAttention
 
 # *----------------------------------------------------------------------------*
 

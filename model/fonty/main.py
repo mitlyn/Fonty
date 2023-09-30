@@ -6,7 +6,7 @@ import torch, torch.nn as nn, torch.optim as op
 from model.fonty import Generator
 from model.share import Discriminator, Hinge, WGANGP
 from model.types import TrainBundle, Options
-from model.utils import setInit
+from model.utils import setInit, setGrads
 
 # TODO: callbacks, learning rate schedulers
 
@@ -50,12 +50,6 @@ class Fonty(LightningModule):
         return [self.G_optimizer, self.Dc_optimizer, self.Ds_optimizer], []
 
 
-    def toggle_grads(self, state: bool, *nets):
-        for net in nets:
-            for param in net.parameters():
-                param.requires_grad = state
-
-
     def set_inputs(self, batch):
         self.content = batch.content.to(self.device).view(1, -1, 64, 64)
         self.target = batch.target.to(self.device).view(1, -1, 64, 64)
@@ -68,11 +62,11 @@ class Fonty(LightningModule):
 
 
     def D_loss(self, real_images, fake_images, discriminator):
-        # Discriminator Loss on Fake data
+        # Discriminator loss on Fake data
         fake = torch.cat(fake_images, 1)
         pred_fake = discriminator(fake.detach())
         loss_D_fake = self.Lh(pred_fake, False)
-        # Discriminator Loss on Real data
+        # Discriminator loss on Real data
         real = torch.cat(real_images, 1)
         pred_real = discriminator(real)
         loss_D_real = self.Lh(pred_real, True)
@@ -81,6 +75,7 @@ class Fonty(LightningModule):
 
 
     def G_loss(self, fake_images, discriminator):
+        # Discriminator loss for Generated data
         fake = torch.cat(fake_images, 1)
         pred_fake = discriminator(fake)
         # Loss according to Discriminator
@@ -93,6 +88,7 @@ class Fonty(LightningModule):
         self.loss_D_style = self.D_loss([self.style, self.target], [self.style, self.result], self.Ds)
         # Combined Loss
         self.loss_D = self.loss_D_content * self.lambda_content + self.loss_D_style * self.lambda_style
+        # Calculate Gradients
         self.loss_D.backward()
 
 
@@ -106,6 +102,7 @@ class Fonty(LightningModule):
         self.loss_G_L1 = self.L1(self.result, self.target)
         # Combined Loss
         self.loss_G = self.loss_G_GAN + self.loss_G_L1 * self.lambda_L1
+        # Calculate Gradients
         self.loss_G.backward()
 
 
@@ -115,14 +112,14 @@ class Fonty(LightningModule):
         # Forward Pass
         self.forward()
         # Update Discriminators
-        self.toggle_grads(True, self.Dc, self.Ds)
+        setGrads(True, self.Dc, self.Ds)
         self.Dc_optimizer.zero_grad()
         self.Ds_optimizer.zero_grad()
         self.D_back()
         self.Dc_optimizer.step()
         self.Ds_optimizer.step()
         # Update Generator
-        self.toggle_grads(False, self.Dc, self.Ds)
+        setGrads(False, self.Dc, self.Ds)
         self.G_optimizer.zero_grad()
         self.G_back()
         self.G_optimizer.step()

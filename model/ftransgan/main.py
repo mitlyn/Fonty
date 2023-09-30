@@ -3,21 +3,20 @@ from lightning import LightningModule
 from torchmetrics import MetricCollection
 import torch, torch.nn as nn, torch.optim as op
 
-from model.emd import Generator
+from model.ftransgan import Generator
 from model.share import Discriminator, Hinge, WGANGP
 from model.types import TrainBundle, Options
 from model.utils import setInit, setGrads
 
 # *----------------------------------------------------------------------------*
 
-
-class EMD(LightningModule):
+class FTransGAN(LightningModule):
     def __init__(self, opt: Options, metrics: Optional[MetricCollection] = None):
-        super(EMD, self).__init__()
+        super(FTransGAN, self).__init__()
 
         self.automatic_optimization = False
 
-        self.G = Generator(opt.refs, 1)
+        self.G = Generator(opt.G_filters, blocks=6, dropout=opt.G_dropout)
         setInit(self.G, opt.init_type, opt.init_gain)
 
         self.Dc = Discriminator(2, opt.D_filters, opt.D_layers)
@@ -26,14 +25,14 @@ class EMD(LightningModule):
         self.Ds = Discriminator(opt.refs + 1, opt.D_filters, opt.D_layers)
         setInit(self.Ds, opt.init_type, opt.init_gain)
 
-        # Loss Functions & Lambdas (loss importance coefficients)
+        # Loss Functions
         self.lambda_L1 = opt.lambda_L1
         self.lambda_style = opt.lambda_style
         self.lambda_content = opt.lambda_content
 
         self.Lh = Hinge().to(self.device)   # Discriminator Only Loss
         self.Lw = WGANGP().to(self.device)  # Generator Only Loss
-        self.L1 = nn.L1Loss()               # Regular Loss
+        self.L1 = nn.L1Loss()               # Pixel-wise Loss
 
         # Validation
         self.vL1 = nn.L1Loss()
@@ -121,21 +120,6 @@ class EMD(LightningModule):
         self.G_optimizer.zero_grad()
         self.G_back()
         self.G_optimizer.step()
-
-        # # self.loss_L1 = torch.mean(torch.abs(self.generated_images-self.gt_images))
-        # weight = self.compute_weight()
-        # self.loss_L1 = torch.mean(torch.sum(torch.abs(self.generated_images-self.gt_images), dim=[1, 2, 3])*weight)
-        # self.loss_L1.backward()
-
-        # def compute_weight(self):
-        #     gt_images = self.gt_images / 2.0 + 0.5
-        #     batch_size = gt_images.shape[0]
-        #     black_pixels = gt_images < 0.5
-        #     num_black_pixels = torch.sum(black_pixels, dim=[1, 2, 3]) + 1
-        #     new_tensor = torch.where(black_pixels, gt_images, torch.tensor(0.).to(self.device))
-        #     mean_black_pixels = torch.sum(new_tensor, dim=[1, 2, 3]) / num_black_pixels
-        #     weight = torch.nn.functional.softmax(mean_black_pixels, dim=0)*batch_size / num_black_pixels
-        #     return weight
 
 
     def on_train_epoch_end(self) -> None:

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 @dataclass
 class Options:
     """Model configuration."""
-    # *--------------------------------------------------------------------* Training & Optimization Options
+    # *------------------------------------------------------------------------* Training & Optimization Options
     # network initialization [normal | xavier | kaiming | orthogonal]
     init_type: str = "normal"
     # scaling factor for initializer
@@ -14,7 +14,7 @@ class Options:
     # initial learning rate
     lr: float = 0.0002
 
-    # *--------------------------------------------------------------------* Model Options
+    # *------------------------------------------------------------------------* Model Options
     # number of reference style images
     refs: int = 52
     # number of G filters in the last conv layer
@@ -33,3 +33,11 @@ class Options:
     lambda_style: float = 1.0
     # weight for L1 loss
     lambda_L1: float = 100.0
+
+    # *------------------------------------------------------------------------* GAS-NeXt Specific Options
+    # weight for local loss
+    lambda_local: float = 0.1
+    # size of GAS-NeXt blocks
+    block_size: int = 32
+    # number of GAS-NeXt blocks
+    num_block: int = 7
