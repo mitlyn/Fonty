@@ -2,8 +2,8 @@
 
 import pickle as pkl
 from os import system
-from random import shuffle
 from asq import query as Q
+from random import shuffle
 from seaborn import heatmap
 from pprint import pprint as pp
 from torch.onnx import export as onnx
@@ -34,41 +34,20 @@ content = load("base").ua
 
 # %%---------------------------------------------------------------------------% Font Selection
 
-# fonts = load("train")
-# shuffle(fonts)
-# pick = fonts
-
-# pick = [*fonts[:10]]
-
-# pick = []
-
-# pick += (
-#     Q(fonts)
-#         .where(lambda x: "Regular" in x.name)
-#         .where(lambda x: x.name not in [
-#             'Lobster Regular',
-#             'Pacifico Regular',
-#             'Amatic SC Regular',
-#             'Rubik Iso Regular',
-#             'Montserrat Alternates Regular'
-#         ]).to_list()
-# )
-
-# Q(pick).select(lambda x: iShowMany(x.ua[0])).to_tuple()
-
-# pick += Q(fonts).where(lambda x: "Alice" in x.name).to_list()
-# pick += Q(fonts).where(lambda x: "Times" in x.name).to_list()
-# pick += Q(fonts).where(lambda x: "Spectral" in x.name).to_list()
+# Load all fonts from the dataset.
+# Train fonts have Cyrillic symbols defined and are trained on.
+# Test fonts have only Latin symbols and are used for inference.
+fonts = load("train")
 
 # %%---------------------------------------------------------------------------% Train/Valid Split + Cache
 
-# train_fonts, valid_fonts = train_test_split(pick, test_size=0.2)
+train_fonts, valid_fonts = train_test_split(fonts, test_size=0.2)
 
 # pkl.dump(train_fonts, open("data/train_fonts.pkl", "wb"))
 # pkl.dump(valid_fonts, open("data/valid_fonts.pkl", "wb"))
 
-train_fonts = pkl.load(open("data/train_fonts.pkl", "rb"))
-valid_fonts = pkl.load(open("data/valid_fonts.pkl", "rb"))
+# train_fonts = pkl.load(open("data/train_fonts.pkl", "rb"))
+# valid_fonts = pkl.load(open("data/valid_fonts.pkl", "rb"))
 
 # %%---------------------------------------------------------------------------% Bundles & Loaders
 
@@ -83,11 +62,11 @@ valid_loader = DataLoader(valid_data, shuffle=False)
 options = Options()
 metrics = Metrics()
 
-model = GasNeXt(options, metrics)
+model = Fonty(options, metrics)
 
 # %%---------------------------------------------------------------------------% Trainer Setup
 
-trainer = Trainer(max_epochs=200)
+trainer = Trainer(max_epochs=1000)
 
 # %%---------------------------------------------------------------------------% Training
 
@@ -95,8 +74,8 @@ trainer.fit(model, train_loader, valid_loader)
 
 # %%---------------------------------------------------------------------------%
 
-# saveModel(model.cpu(), "model.pt")
-# model = loadModel("model.pt").cuda()
+saveModel(model.cpu(), "model.pt")
+model = loadModel("model.pt").cuda()
 
 # %%---------------------------------------------------------------------------% Result Inspection
 
@@ -116,7 +95,6 @@ for k in valid_score:
 
 X = train_loader.dataset[1272]
 iShowMany(X.content, X.target, applyPanose(model, X))
-# iSave(x, "test")
 
 # %%---------------------------------------------------------------------------% Result Illustration
 
@@ -137,18 +115,18 @@ iShowMany(X.content, X.target, applyPanose(model, X))
 
 # %%---------------------------------------------------------------------------%
 
-# W = model.G.Ep.linear[0].weight.detach().cpu().numpy()
-# heatmap(W, cmap="coolwarm")
+W = model.G.Ep.linear[0].weight.detach().cpu().numpy()
+heatmap(W, cmap="coolwarm")
 
 # %%---------------------------------------------------------------------------%
 
-# for i in range(len(train_loader.dataset)):
-#     X = train_loader.dataset[i]
-#     Y = apply(model, X)
-#     i3Save(X.content, X.style, Y, f"out3/{i}")
+for i in range(len(train_loader.dataset)):
+    X = train_loader.dataset[i]
+    Y = apply(model, X)
+    i3Save(X.content, X.style, Y, f"out/{i}")
 
 # %%---------------------------------------------------------------------------%
 
-# onnx(model.G.Ep.to("cuda"), {"panose":model.panose.to("cuda")}, "G.onnx")
+# onnx(model.G.Ep.to("cuda"), {"panose":model.panose.to("cuda")}, "Fonty.onnx")
 
 # %%---------------------------------------------------------------------------%
